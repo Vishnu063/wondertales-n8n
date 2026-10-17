@@ -1,0 +1,31 @@
+# Secrets and local credentials
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+client_secret*.json
+*cookie*
+*session*
+auth/
+profiles/
+.gflow/
+
+# Generated media and run state
+output/
+outputs/
+tmp/
+generated/
+*.mp4
+*.mov
+*.webm
+*.sqlite
+*.sqlite3
+*.db
+
+# Python / local tooling
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
