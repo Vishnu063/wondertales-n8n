@@ -1,0 +1,54 @@
+{
+  "name": "WonderTales — Setup Diagnostics",
+  "nodes": [
+    {
+      "id": "a27a0637-0181-547b-bb51-852da83658c2",
+      "name": "Check Setup",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "07d81cc5-c1ce-5f42-b823-6ec859bc5769",
+      "name": "Check Local Tools and Account Aliases",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/setup",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Check Setup": {
+      "main": [
+        [
+          {
+            "node": "Check Local Tools and Account Aliases",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

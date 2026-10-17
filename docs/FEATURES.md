@@ -1,0 +1,29 @@
+# The 11 improvements
+
+“Implemented” below means code and offline tests are present. It does not mean an owner's accounts have been connected or the integration has been proved live.
+
+| # | Improvement | Implementation | Verification / remaining work |
+| --- | --- | --- | --- |
+| 1 | Credit protection | Configured cost estimate, server-calculated scene count, per-job cap, current balance check, explicit model/count, identical-job deduplication | Offline failures/caps tested; account balance and displayed Google pricing need live confirmation |
+| 2 | Resume failed jobs | SQLite checkpoints, clip reuse, safe-stage resume, explicit recovery of uncertain scenes | Restart, missing-reference, uncertain-scene, and clip-reuse tests pass |
+| 3 | Consistent characters | Ten editable profiles, stable two/three-character casting, shared reference images, fixed descriptions, one narrator voice per language | Casting tested; actual reference fidelity, voices, and Hindi output require owner review |
+| 4 | Account selection | Account-management form, private local profile allowlist, one serialized browser runner, per-channel OAuth workflows, channel-ID guard | Offline routing/claim tests pass; multiple signed-in accounts not live-tested |
+| 5 | Clear n8n status | Separate status/recovery/setup forms/workflows, progress, errors, media report, private YouTube link | Worker API tested; actual n8n import/activation and UI experience need live testing |
+| 6 | Video quality checks | Narration fit before paid clips, scene completeness, aspect/resolution/duration checks, burned timed captions, audio level, complete decode | Synthetic FFmpeg end-to-end passes; semantic/visual quality and Hindi font shaping still need review |
+| 7 | Simple setup | Setup/start/login helpers, local tool diagnostics, loopback-only service, protected token, local/EC2 instructions | Scripts checked; clean install, Node compatibility, and owner's EC2 tunnel not live-tested |
+| 8 | Children's settings | Private upload, selfDeclaredMadeForKids=true, no subscriber notifications, no automatic public publication | Workflow fields verified against upstream n8n node source; no real YouTube upload yet |
+| 9 | Actual Flow connection check | Read-only n8n preflight plus setup diagnostics, before a paid end-to-end test | **Pending owner's spare Chrome sign-in. No live Flow test has been performed.** |
+| 10 | Stop on login/CAPTCHA errors | Fail closed on unverifiable login/balance; uncertain generation stops the queue; no automated challenge solving or paid retries | Failed-login/uncertain-job tests pass; provider-specific live errors need testing |
+| 11 | Preserve work / avoid duplicates | Durable scene records, billing boundary before launch, saved files, atomic upload claim, uncertain-upload reconciliation | Concurrent-claim, restart, deduplication, and repeated-assembly tests pass |
+
+## Live acceptance checklist
+
+1. Install the tools, import the workflows, and select the local header credential.
+2. Sign into one dedicated Chrome profile; run Setup Diagnostics and the zero-video-credit Preflight.
+3. Fill character definitions/references and verify the Flow model, per-clip estimate, and cap.
+4. Submit one short story, check actual billing and saved scenes, and inspect narration/captions.
+5. Connect one YouTube OAuth credential, set its expected channel ID, and enable its private-upload workflow.
+6. Confirm the real uploaded video is Private and made for kids; inspect it in YouTube Studio.
+7. Test a safe assembly resume without making another Flow generation. Configure further accounts/channels only after the first complete run works.
+
+Do not claim the project is production-ready until these owner-account checks have passed. No additional questions are required to finish the code; account sign-in and real output review require the owner.

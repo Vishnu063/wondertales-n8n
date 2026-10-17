@@ -1,0 +1,1 @@
+"""WonderTales local video worker."""

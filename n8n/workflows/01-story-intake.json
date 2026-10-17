@@ -2,10 +2,18 @@
   "name": "WonderTales — Story Intake",
   "nodes": [
     {
+      "id": "d509800b-61bb-5df6-9fc2-70a236a6392f",
+      "name": "Story Submission Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
       "parameters": {
         "path": "wondertales-story",
         "formTitle": "Create a WonderTales video",
-        "formDescription": "Paste your story, poem, or nursery rhyme. The video will be uploaded to YouTube as Private for your review.",
+        "formDescription": "Use n8n execution results to see status and errors. All uploads remain Private.",
         "formFields": {
           "values": [
             {
@@ -21,6 +29,7 @@
             {
               "fieldLabel": "Language",
               "fieldType": "dropdown",
+              "requiredField": true,
               "fieldOptions": {
                 "values": [
                   {
@@ -30,12 +39,12 @@
                     "option": "Hindi"
                   }
                 ]
-              },
-              "requiredField": true
+              }
             },
             {
               "fieldLabel": "Video format",
               "fieldType": "dropdown",
+              "requiredField": true,
               "fieldOptions": {
                 "values": [
                   {
@@ -45,12 +54,12 @@
                     "option": "16:9 landscape"
                   }
                 ]
-              },
-              "requiredField": true
+              }
             },
             {
               "fieldLabel": "Target duration",
               "fieldType": "dropdown",
+              "requiredField": true,
               "fieldOptions": {
                 "values": [
                   {
@@ -66,265 +75,294 @@
                     "option": "2 minutes"
                   }
                 ]
-              },
-              "requiredField": true
+              }
+            },
+            {
+              "fieldLabel": "Flow account alias (blank uses flow-main)",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "YouTube destination alias (blank uses channel-main)",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Consistency",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Reference images"
+                  },
+                  {
+                    "option": "Text descriptions (less consistent)"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Variant label (optional; change only for an intentional new version)",
+              "fieldType": "text",
+              "requiredField": false
             }
           ]
         },
         "responseMode": "lastNode",
         "options": {}
       },
-      "type": "n8n-nodes-base.formTrigger",
-      "typeVersion": 2.2,
-      "position": [
-        -620,
-        80
-      ],
-      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a01",
-      "name": "Story Submission Form",
-      "webhookId": "wondertales-story-intake"
+      "webhookId": "5593e850-3a57-52cf-b679-b29bc69db13c"
     },
     {
+      "id": "9b5c2639-ec48-5aa9-ae7b-7facfedb615f",
+      "name": "Character Registry (edit in n8n)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
       "parameters": {
         "assignments": {
           "assignments": [
             {
-              "id": "character-01-name",
+              "id": "character_01_name",
               "name": "character_01_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-01-face_prompt",
+              "id": "character_01_face_prompt",
               "name": "character_01_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-01-body_prompt",
+              "id": "character_01_body_prompt",
               "name": "character_01_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-01-voice",
-              "name": "character_01_voice",
+              "id": "character_01_reference_image",
+              "name": "character_01_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-02-name",
+              "id": "character_02_name",
               "name": "character_02_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-02-face_prompt",
+              "id": "character_02_face_prompt",
               "name": "character_02_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-02-body_prompt",
+              "id": "character_02_body_prompt",
               "name": "character_02_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-02-voice",
-              "name": "character_02_voice",
+              "id": "character_02_reference_image",
+              "name": "character_02_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-03-name",
+              "id": "character_03_name",
               "name": "character_03_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-03-face_prompt",
+              "id": "character_03_face_prompt",
               "name": "character_03_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-03-body_prompt",
+              "id": "character_03_body_prompt",
               "name": "character_03_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-03-voice",
-              "name": "character_03_voice",
+              "id": "character_03_reference_image",
+              "name": "character_03_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-04-name",
+              "id": "character_04_name",
               "name": "character_04_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-04-face_prompt",
+              "id": "character_04_face_prompt",
               "name": "character_04_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-04-body_prompt",
+              "id": "character_04_body_prompt",
               "name": "character_04_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-04-voice",
-              "name": "character_04_voice",
+              "id": "character_04_reference_image",
+              "name": "character_04_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-05-name",
+              "id": "character_05_name",
               "name": "character_05_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-05-face_prompt",
+              "id": "character_05_face_prompt",
               "name": "character_05_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-05-body_prompt",
+              "id": "character_05_body_prompt",
               "name": "character_05_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-05-voice",
-              "name": "character_05_voice",
+              "id": "character_05_reference_image",
+              "name": "character_05_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-06-name",
+              "id": "character_06_name",
               "name": "character_06_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-06-face_prompt",
+              "id": "character_06_face_prompt",
               "name": "character_06_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-06-body_prompt",
+              "id": "character_06_body_prompt",
               "name": "character_06_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-06-voice",
-              "name": "character_06_voice",
+              "id": "character_06_reference_image",
+              "name": "character_06_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-07-name",
+              "id": "character_07_name",
               "name": "character_07_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-07-face_prompt",
+              "id": "character_07_face_prompt",
               "name": "character_07_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-07-body_prompt",
+              "id": "character_07_body_prompt",
               "name": "character_07_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-07-voice",
-              "name": "character_07_voice",
+              "id": "character_07_reference_image",
+              "name": "character_07_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-08-name",
+              "id": "character_08_name",
               "name": "character_08_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-08-face_prompt",
+              "id": "character_08_face_prompt",
               "name": "character_08_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-08-body_prompt",
+              "id": "character_08_body_prompt",
               "name": "character_08_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-08-voice",
-              "name": "character_08_voice",
+              "id": "character_08_reference_image",
+              "name": "character_08_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-09-name",
+              "id": "character_09_name",
               "name": "character_09_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-09-face_prompt",
+              "id": "character_09_face_prompt",
               "name": "character_09_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-09-body_prompt",
+              "id": "character_09_body_prompt",
               "name": "character_09_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-09-voice",
-              "name": "character_09_voice",
+              "id": "character_09_reference_image",
+              "name": "character_09_reference_image",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-10-name",
+              "id": "character_10_name",
               "name": "character_10_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-10-face_prompt",
+              "id": "character_10_face_prompt",
               "name": "character_10_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-10-body_prompt",
+              "id": "character_10_body_prompt",
               "name": "character_10_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-10-voice",
-              "name": "character_10_voice",
+              "id": "character_10_reference_image",
+              "name": "character_10_reference_image",
               "value": "",
               "type": "string"
             }
@@ -332,50 +370,74 @@
         },
         "includeOtherFields": true,
         "options": {}
-      },
+      }
+    },
+    {
+      "id": "9d1f2ead-8d39-5565-bb38-f0e3511bad5d",
+      "name": "Credit Settings (configure in n8n)",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -360,
-        80
+        480,
+        0
       ],
-      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a02",
-      "name": "Character Registry (edit in n8n)"
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "creditCostPerClip",
+              "name": "creditCostPerClip",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "maxCreditsPerJob",
+              "name": "maxCreditsPerJob",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
     },
     {
-      "parameters": {
-        "mode": "runOnceForEachItem",
-        "jsCode": "const form = $('Story Submission Form').first().json;\nconst registry = $('Character Registry (edit in n8n)').first().json;\nconst characterPool = Array.from({ length: 10 }, (_, index) => {\n  const slot = String(index + 1).padStart(2, '0');\n  const name = String(registry[`character_${slot}_name`] || '').trim();\n  const facePrompt = String(registry[`character_${slot}_face_prompt`] || '').trim();\n  const bodyPrompt = String(registry[`character_${slot}_body_prompt`] || '').trim();\n  const voice = String(registry[`character_${slot}_voice`] || '').trim();\n  return { name, facePrompt, bodyPrompt, voice };\n}).filter(character => character.name && character.facePrompt && character.bodyPrompt);\n\nif (characterPool.length < 2) {\n  throw new Error('Fill in at least two characters with a name, face description, and body/clothing description in the Character Registry node.');\n}\n\nconst language = String(form['Language'] || '').trim();\nconst formatChoice = String(form['Video format'] || '').trim();\nconst durationChoice = String(form['Target duration'] || '').trim();\nconst title = String(form['Story title'] || '').trim();\nconst story = String(form['Story / poem / rhyme'] || '').trim();\n\nif (!title || !story) throw new Error('Story title and story text are required.');\nif (!['English', 'Hindi'].includes(language)) throw new Error('Choose English or Hindi.');\nif (!['9:16 vertical', '16:9 landscape'].includes(formatChoice)) throw new Error('Choose a supported video format.');\n\nconst durationSeconds = {\n  '30 seconds': 30,\n  '1 minute': 60,\n  '90 seconds': 90,\n  '2 minutes': 120\n}[durationChoice];\nif (!durationSeconds) throw new Error('Choose a supported duration.');\n\nconst shuffled = [...characterPool];\nfor (let i = shuffled.length - 1; i > 0; i--) {\n  const j = Math.floor(Math.random() * (i + 1));\n  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\n}\nconst desiredCount = Math.random() < 0.5 ? 2 : 3;\nconst selectedCharacters = shuffled.slice(0, Math.min(desiredCount, shuffled.length));\nconst plannedSceneCount = Math.ceil(durationSeconds / 8);\n\nreturn {\n  json: {\n    requestId: String($execution.id),\n    title,\n    story,\n    language,\n    aspectRatio: formatChoice.startsWith('9:16') ? '9:16' : '16:9',\n    durationSeconds,\n    model: 'veo-lite',\n    plannedSceneCount,\n    selectedCharacters: selectedCharacters.map(character => ({ ...character, identity: 'entity' })),\n    uploadVisibility: 'private'\n  }\n};"
-      },
+      "id": "db3897fa-e31c-5cd5-9d06-44bafe7fb265",
+      "name": "Validate and Choose Characters",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -80,
-        80
+        720,
+        0
       ],
-      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a03",
-      "name": "Validate and Choose Characters"
+      "parameters": {
+        "jsCode": "const form = $('Story Submission Form').first().json;\nconst registry = $('Character Registry (edit in n8n)').first().json;\nconst config = $input.first().json;\nconst title = String(form['Story title'] || '').trim();\nconst story = String(form['Story / poem / rhyme'] || '').trim();\nconst language = form.Language;\nif (!['9:16 vertical','16:9 landscape'].includes(form['Video format'])) throw new Error('Choose a supported video format.');\nif (!['Reference images','Text descriptions (less consistent)'].includes(form.Consistency)) throw new Error('Choose an explicit consistency mode.');\nconst aspectRatio = form['Video format'] === '9:16 vertical' ? '9:16' : '16:9';\nconst durationSeconds = {'30 seconds':30, '1 minute':60, '90 seconds':90, '2 minutes':120}[form['Target duration']];\nif (!title || !story || !durationSeconds || !['English','Hindi'].includes(language)) throw new Error('Check the story, language, and duration.');\nconst pool = Array.from({length:10}, (_,i) => {\n  const slot = String(i+1).padStart(2,'0');\n  const read = suffix => String(registry[`character_${slot}_${suffix}`] || '').trim();\n  return {name:read('name'), facePrompt:read('face_prompt'), bodyPrompt:read('body_prompt'), referenceImage:read('reference_image')};\n}).filter(c => c.name && c.facePrompt && c.bodyPrompt);\nif (pool.length < 2) throw new Error('Fill in at least two character names, faces, and clothing descriptions in Character Registry.');\nif (new Set(pool.map(c=>c.name)).size !== pool.length) throw new Error('Use unique character names.');\nconst variant = String(form['Variant label (optional; change only for an intentional new version)'] || '').trim();\n// Stable pseudorandom casting: a retried identical submission must not create a new paid job.\nlet seed = 2166136261;\nfor (const ch of JSON.stringify([title, story, language, aspectRatio, durationSeconds, variant])) seed = Math.imul(seed ^ ch.charCodeAt(0), 16777619) >>> 0;\nconst random = () => { seed = (Math.imul(seed,1664525) + 1013904223) >>> 0; return seed / 4294967296; };\nfor (let i=pool.length-1; i>0; i--) { const j=Math.floor(random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }\nconst count = Math.min(pool.length, random()<0.5 ? 2 : 3);\nconst creditCostPerClip = Number(config.creditCostPerClip);\nconst maxCreditsPerJob = Number(config.maxCreditsPerJob);\nif (!Number.isFinite(creditCostPerClip) || !Number.isFinite(maxCreditsPerJob) || !(creditCostPerClip>0) || !(maxCreditsPerJob>0)) throw new Error('Set the displayed Flow cost per clip and your per-job credit cap in Credit Settings.');\nreturn [{json:{title, story, language, aspectRatio, durationSeconds, variant,\n flowAccount:String(form['Flow account alias (blank uses flow-main)'] || 'flow-main').trim(),\n youtubeDestination:String(form['YouTube destination alias (blank uses channel-main)'] || 'channel-main').trim(),\n selectedCharacters:pool.slice(0,count), creditCostPerClip, maxCreditsPerJob,\n consistencyMode:form.Consistency === 'Reference images' ? 'reference' : 'text',\n model:'veo-lite', uploadVisibility:'private', madeForKids:true}}];"
+      }
     },
     {
-      "parameters": {
-        "method": "POST",
-        "url": "http://127.0.0.1:8099/v1/jobs",
-        "sendBody": true,
-        "contentType": "json",
-        "specifyBody": "json",
-        "jsonBody": "={{ $json }}",
-        "options": {
-          "timeout": 30000
-        }
-      },
+      "id": "89b2afe7-7a38-571d-9784-639000182ed4",
+      "name": "Queue Local Video Job",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        220,
-        80
+        960,
+        0
       ],
-      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a04",
-      "name": "Queue Local Video Job"
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/jobs",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "retryOnFail": false
     }
   ],
   "connections": {
@@ -391,6 +453,17 @@
       ]
     },
     "Character Registry (edit in n8n)": {
+      "main": [
+        [
+          {
+            "node": "Credit Settings (configure in n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Credit Settings (configure in n8n)": {
       "main": [
         [
           {
@@ -416,10 +489,6 @@
   "active": false,
   "settings": {
     "executionOrder": "v1"
-  },
-  "versionId": "4d889225-a37d-4d4d-921f-81a8ef6dd933",
-  "meta": {
-    "templateCredsSetupCompleted": false
   },
   "tags": []
 }

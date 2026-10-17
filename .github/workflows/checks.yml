@@ -1,0 +1,19 @@
+name: Offline checks (no provider credits)
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install media tools
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core
+      - name: Check Python and actual media assembly
+        run: python3 -m unittest discover -s tests -v
+      - name: Check workflow exports and casting
+        run: node tests/check_workflows.js
+      - name: Check shell scripts
+        run: for script in scripts/*.sh; do bash -n "$script"; done
