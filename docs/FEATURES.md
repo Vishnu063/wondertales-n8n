@@ -40,3 +40,14 @@ Do not claim the project is production-ready until these owner-account checks ha
 - **Archive:** stopped stories can be archived without deleting paid clips/history; uncertain uploads must be reconciled first.
 
 The added workflows are 08 Story Bank, 09 Daily Queue Manager, 10 Queue Controls, and 11 Daily Summary. All exports remain inactive by default. Enable 09 for automatic dispatch; the worker alone does not release new jobs. Owner-account live validation is still pending.
+
+## Optional editing and growth additions
+
+- Optional MoneyPrinterTurbo local rendering with pinned source, separate environment, explicit local assets, clean/kids captions and optional licensed background music. No extra provider/browser pipeline.
+- Pre-generation text-similarity check, explicit intentional variants, learning-goal and rights-note fields.
+- Credit estimates and saved-clip counts in Job Status; figures are labelled as estimates rather than actual bills.
+- Daily read-only YouTube Analytics snapshots with explicit channel/destination checks, window replacement, stale-data detection and public-video matching.
+- Weekly rule-based performance and publication reminders, with owner rights notes and sample-size labels. No paid AI or outbound messaging.
+- Owner-text title suggestions and three saved video-frame candidates, previewable through n8n.
+
+See [setup, limitations and first live run](EDITOR_AND_GROWTH.md). Offline fixtures test contracts, failure recovery, FFmpeg preparation and workflow JavaScript. Actual upstream rendering, OAuth APIs and imported n8n execution still require live owner-account validation.

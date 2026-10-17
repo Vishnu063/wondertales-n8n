@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from .core import Pipeline, StopJob, Store, allowed_file, probe, validate
 from .queue import QueueManager
+from .growth import Growth, story_check, cost_report
 
 
 def load_settings(root):
@@ -53,6 +54,7 @@ class Service:
         self.mutations = threading.Lock()
         self.browser = threading.Lock()
         self.manager = QueueManager(self)
+        self.growth = Growth(self.store, settings)
 
     def configure_accounts(self, body):
         if not self.browser.acquire(blocking=False):
@@ -126,6 +128,7 @@ class Service:
         from .queue import HUMAN
         job['nextAction'] = HUMAN.get(job['state'], 'Wait for the next balance check.' if job['state']=='blocked_credit' else 'Use Resume Everything in Queue Controls.' if job['state']=='paused' else 'No action needed.')
         job['youtubeUrl'] = f"https://www.youtube.com/watch?v={job['youtube_id']}" if job.get('youtube_id') else None
+        job['creditReport'] = cost_report(job)
         return job
 
     def action(self, ident, action, body):
@@ -221,10 +224,22 @@ def make_handler(service, token):
                 if not isinstance(body, dict):
                     raise ValueError('Send a JSON object')
             if method == 'GET' and path == '/v1/setup':
+                from .editor import status as editor_status
                 return self.send_json(200, {'tools': {x: bool(shutil.which(x)) for x in ('gflow', 'edge-tts', 'ffmpeg', 'ffprobe')},
                     'flowAccounts': list(service.settings['accounts']),
                     'youtubeDestinations': service.settings['youtubeDestinations'],
-                    'browserConcurrency': 1, 'generationModel': 'veo-lite'})
+                    'browserConcurrency': 1, 'generationModel': 'veo-lite',
+                    'optionalEditor': editor_status(service.settings, service.root)})
+            if method == 'POST' and path == '/v1/analytics/snapshot':
+                return self.send_json(200, service.growth.save(body))
+            if method == 'GET' and path == '/v1/analytics/jobs':
+                return self.send_json(200, {'jobs': [{'id': j['id'], 'destination': j['body']['youtubeDestination'],
+                    'youtubeId': j['youtube_id']} for j in service.store.list(limit=None) if j.get('youtube_id')]})
+            if method == 'GET' and path == '/v1/growth/report':
+                return self.send_json(200, service.growth.report())
+            if method == 'POST' and path == '/v1/stories/check':
+                data = validate(body, service.settings)
+                return self.send_json(200, story_check(data, service.store.list(limit=None)))
             if path == '/v1/queue/command' and method == 'POST':
                 action = body.get('action')
                 if action not in ('pause','resume','tick','summary'):
@@ -268,22 +283,24 @@ def make_handler(service, token):
                 finally:
                     service.browser.release()
                 return self.send_json(200, {'checked': True, 'plannedSceneCount': data['plannedSceneCount'],
-                                            'estimatedCredits': data['estimatedCredits'], 'spentCredits': 0})
-            match = re.fullmatch(r'/v1/jobs/([a-f0-9]{32})(?:/([a-z-]+))?', path)
+                                            'estimatedCredits': data['estimatedCredits'], 'spentCredits': 0,
+                                            'storyReview': story_check(data, service.store.list(limit=None))})
+            match = re.fullmatch(r'/v1/jobs/([a-f0-9]{32})(?:/([a-z-]+|thumbnail-[123]))?', path)
             if not match:
                 return self.send_json(404, {'error': 'Unknown endpoint'})
             ident, action = match.groups()
             if method == 'POST' and action:
                 return self.send_json(200, service.action(ident, action, body))
             job = service.store.get(ident)
-            if method == 'GET' and action in ('video', 'captions'):
+            if method == 'GET' and action in ('video', 'captions', 'thumbnail-1', 'thumbnail-2', 'thumbnail-3'):
                 if job['state'] not in ('ready', 'uploading', 'uploaded', 'upload_uncertain'):
                     raise ValueError('The final video is not ready')
-                file = service.root/'jobs'/ident/('final.mp4' if action == 'video' else 'captions.srt')
+                filename = 'final.mp4' if action == 'video' else 'captions.srt' if action == 'captions' else action+'.jpg'
+                file = service.root/'jobs'/ident/filename
                 if not file.is_file():
                     raise KeyError('Missing output file')
                 self.send_response(200)
-                self.send_header('Content-Type', 'video/mp4' if action == 'video' else 'application/x-subrip')
+                self.send_header('Content-Type', 'video/mp4' if action == 'video' else 'application/x-subrip' if action == 'captions' else 'image/jpeg')
                 self.send_header('Content-Length', str(file.stat().st_size))
                 self.send_header('Cache-Control', 'no-store')
                 self.end_headers()

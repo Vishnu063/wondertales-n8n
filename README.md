@@ -2,7 +2,7 @@
 
 Turn your own children's stories, poems, and spoken nursery rhymes into animated videos, then upload them to YouTube as **Private**. Manage submissions, character profiles, credit caps, job status, recovery, and destination selection through n8n.
 
-**Status:** local worker and eleven n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
+**Status:** local worker and fifteen n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
 
 ## What it does
 
@@ -14,7 +14,19 @@ Turn your own children's stories, poems, and spoken nursery rhymes into animated
 - Saves each clip, checks the final file, and claims an upload once before sending it to the selected YouTube channel. Uploads are Private, made for kids, and have subscriber notifications off.
 - Stops on unverified login/balance, CAPTCHA/provider failures, uncertain billing, and uncertain uploads. Never automatically resubmits an uncertain scene or reclaims an uncertain upload.
 
-See [all 11 improvements and their verification status](docs/FEATURES.md).
+See [feature verification status](docs/FEATURES.md) and the [editor and growth setup guide](docs/EDITOR_AND_GROWTH.md).
+
+## Added: optional editor and growth reports
+
+Choose **MoneyPrinterTurbo** in the story form to edit existing Flow clips locally with clean/kids captions and optional owner-supplied music. The default remains the lighter built-in FFmpeg editor. Install the optional editor only on the worker computer:
+
+```bash
+bash scripts/setup-mpt.sh
+```
+
+It uses a separate environment and an exact upstream source revision. No additional video provider, AI subscription, stock service or browser is used. The full upstream package has substantial dependencies; built-in editing is preferable on a small EC2 instance. This integration does not turn spoken narration into sung nursery rhymes.
+
+Workflows **12–15** add analytics, a weekly improvement report, a story check and thumbnail previews. Analytics requires Google OAuth setup before activation. All new workflows are inactive by default. **The actual MoneyPrinterTurbo renderer, imported n8n workflows and authenticated YouTube Analytics calls have not been live-tested here.** See the [complete setup and limitations](docs/EDITOR_AND_GROWTH.md).
 
 ## Local setup: computer with the spare Chrome browser
 
@@ -77,6 +89,10 @@ This is the recommended first setup. macOS and Linux are supported; Windows can 
 | 09 Daily Queue Manager | Once enabled, checks every five minutes and releases at most one managed video job per local day |
 | 10 Queue Controls | Pause everything, resume, run a queue check, or view the summary |
 | 11 Daily Summary | Once enabled, records a summary at 8 PM Asia/Kolkata in n8n execution results; sends no messages |
+| 12 YouTube Analytics | Daily read-only refresh of channel statistics, rolling 28-day video analytics and recent publication status |
+| 13 Weekly Growth Review | Monday report, or run manually: performance, credit estimates, rights notes and publication reminders |
+| 14 Story Review | Text-similarity check and rights/learning-goal reminders without browser access or generation |
+| 15 Thumbnail Preview | Download one of three saved video-frame candidates for your review |
 
 Use the n8n execution data view to see outputs and detailed errors. These are workflow forms and execution results, not a separate custom dashboard. Save the returned job ID after submission.
 

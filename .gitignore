@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 .venv/
+.mpt-venv/
 .runtime/
 .n8n/
 __pycache__/

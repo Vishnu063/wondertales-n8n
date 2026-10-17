@@ -1,0 +1,329 @@
+{
+  "name": "WonderTales — Daily YouTube Analytics",
+  "nodes": [
+    {
+      "id": "6cd23b8f-390f-5a72-83ad-24659d012652",
+      "name": "Refresh Analytics Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c613c127-92a9-5c71-825f-0d8c4c375583",
+      "name": "Analytics Destination (configure)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "destination",
+              "name": "destination",
+              "value": "channel-main",
+              "type": "string"
+            },
+            {
+              "id": "expectedChannelId",
+              "name": "expectedChannelId",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "2a426f62-c1bd-5c07-9afb-ac2611b281d7",
+      "name": "Verify Analytics Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels?part=id,statistics&mine=true",
+        "method": "GET",
+        "authentication": "predefinedCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "cc685254-6f53-54f0-84d0-54dd24cea548",
+      "name": "Guard Analytics Identity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c=$('Analytics Destination (configure)').first().json;\nif(!/^UC[A-Za-z0-9_-]{22}$/.test(c.expectedChannelId || '')) throw new Error('Configure the expected YouTube channel ID.');\nconst ch=($input.first().json.items || []).find(x=>x.id===c.expectedChannelId);\nif(!ch) throw new Error('YouTube OAuth channel does not match this destination.');\nconst s=ch.statistics || {};\nconst subscriberCount=s.hiddenSubscriberCount || s.subscriberCount===undefined ? null : Number(s.subscriberCount);\nconst end=new Date(); end.setUTCDate(end.getUTCDate()-2);\nconst start=new Date(end); start.setUTCDate(start.getUTCDate()-27);\nreturn [{json:{destination:c.destination,channelId:c.expectedChannelId,subscriberCount,\n startDate:start.toISOString().slice(0,10),endDate:end.toISOString().slice(0,10)}}];"
+      }
+    },
+    {
+      "id": "5bf88700-8963-5871-84d7-499662f1f887",
+      "name": "List Managed Uploads",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/analytics/jobs",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "0deff426-65a3-5459-8696-89482005e9de",
+      "name": "Select Latest 50 Uploads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c=$('Guard Analytics Identity').first().json;\nconst ids=[...new Set(($input.first().json.jobs || []).filter(j=>j.destination===c.destination && j.youtubeId).map(j=>j.youtubeId))].slice(0,50);\n// A new channel with no managed uploads can still be checked using its channel statistics.\nreturn [{json:{...c,ids,videoStatusUrl:ids.length ? 'https://www.googleapis.com/youtube/v3/videos?part=id,status,snippet&id='+encodeURIComponent(ids.join(',')) : 'https://www.googleapis.com/youtube/v3/videos?part=id,status,snippet&id=00000000000'}}];"
+      }
+    },
+    {
+      "id": "6ead95ba-f7ae-50f4-adc3-cc47d2eb884e",
+      "name": "Read Publication Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.videoStatusUrl }}",
+        "method": "GET",
+        "authentication": "predefinedCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "7b091b2f-9d5a-5d7c-9b5c-f8ba290299e9",
+      "name": "Build Read Only Analytics Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c=$('Select Latest 50 Uploads').first().json;\nconst videos=($input.first().json.items || []).map(v=>({id:v.id,channelId:v.snippet?.channelId,privacyStatus:v.status?.privacyStatus}));\nif(videos.some(v=>v.channelId!==c.channelId)) throw new Error('A managed video belongs to a different channel.');\nconst query={ids:'channel=='+c.channelId,startDate:c.startDate,endDate:c.endDate,dimensions:'video',metrics:'views,estimatedMinutesWatched,averageViewPercentage,subscribersGained',sort:'-estimatedMinutesWatched',maxResults:'200'};\nconst url='https://youtubeanalytics.googleapis.com/v2/reports?'+Object.entries(query).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');\nreturn [{json:{...c,videos,url}}];"
+      }
+    },
+    {
+      "id": "8c772685-ac71-54b9-9f69-10d808b3fadc",
+      "name": "Read YouTube Analytics (read-only OAuth)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "url": "={{ $json.url }}",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "oAuth2Api"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "4d0442ad-c9a0-560c-bc56-8023b90a2a27",
+      "name": "Normalize Analytics Snapshot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const c=$('Build Read Only Analytics Query').first().json;\nconst report=$input.first().json;\nif(report.error || !Array.isArray(report.columnHeaders)) throw new Error('YouTube Analytics returned an invalid report; previous snapshot is preserved.');\nconst names=report.columnHeaders.map(h=>h.name);\nconst required=['video','views','estimatedMinutesWatched','averageViewPercentage','subscribersGained'];\nif(required.some(k=>!names.includes(k))) throw new Error('Analytics columns changed. Update the integration before saving.');\nconst rows=(report.rows || []).map(row=>Object.fromEntries(required.map(k=>[k,row[names.indexOf(k)]])));\nreturn [{json:{destination:c.destination,channelId:c.channelId,subscriberCount:c.subscriberCount,startDate:c.startDate,endDate:c.endDate,videos:c.videos,rows}}];"
+      }
+    },
+    {
+      "id": "9f540d75-58f5-5f97-b1ce-5fd1e24eaedf",
+      "name": "Save Private Analytics Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/analytics/snapshot",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Refresh Analytics Daily": {
+      "main": [
+        [
+          {
+            "node": "Analytics Destination (configure)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analytics Destination (configure)": {
+      "main": [
+        [
+          {
+            "node": "Verify Analytics Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Analytics Channel": {
+      "main": [
+        [
+          {
+            "node": "Guard Analytics Identity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard Analytics Identity": {
+      "main": [
+        [
+          {
+            "node": "List Managed Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Managed Uploads": {
+      "main": [
+        [
+          {
+            "node": "Select Latest 50 Uploads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Select Latest 50 Uploads": {
+      "main": [
+        [
+          {
+            "node": "Read Publication Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Publication Status": {
+      "main": [
+        [
+          {
+            "node": "Build Read Only Analytics Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Read Only Analytics Query": {
+      "main": [
+        [
+          {
+            "node": "Read YouTube Analytics (read-only OAuth)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read YouTube Analytics (read-only OAuth)": {
+      "main": [
+        [
+          {
+            "node": "Normalize Analytics Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Analytics Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Save Private Analytics Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "tags": []
+}

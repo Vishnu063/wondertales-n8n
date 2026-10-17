@@ -1,0 +1,2 @@
+# Optional official MoneyPrinterTurbo renderer; pin the inspected source, not moving main.
+mpt @ git+https://github.com/harry0703/MoneyPrinterTurbo.git@9e7d8b7efa6b912058156943906542b53b945f0a

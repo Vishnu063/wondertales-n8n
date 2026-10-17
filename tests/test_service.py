@@ -132,5 +132,21 @@ class ServiceTests(unittest.TestCase):
         _,data=self.request('/v1/jobs/'+job['id'])
         self.assertFalse(data['canClaimUpload'])
 
+    def test_growth_endpoints_require_auth_and_story_check_spends_nothing(self):
+        from test_growth import snapshot
+        for path, data in [('/v1/growth/report', None), ('/v1/analytics/snapshot', snapshot()),
+                           ('/v1/analytics/jobs', None), ('/v1/stories/check', body())]:
+            status, _ = self.request(path, data, token=False)
+            self.assertEqual(status, 401)
+        self.service.pipeline.command = Mock()
+        status, result = self.request('/v1/stories/check', body())
+        self.assertEqual(status, 200); self.assertIn('warnings', result)
+        self.service.pipeline.command.assert_not_called()
+        self.assertEqual(self.service.store.list(), [])
+        status, _ = self.request('/v1/analytics/snapshot', snapshot())
+        self.assertEqual(status, 200)
+        status, result = self.request('/v1/growth/report')
+        self.assertEqual(result['channels'][0]['subscriberCount'], 42)
+
 
 if __name__=='__main__': unittest.main()

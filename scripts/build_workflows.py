@@ -32,6 +32,8 @@ def http(name, url, x, method='GET', body=None, download=False, google=False):
     if download:
         params['options']['response'] = {'response': {'responseFormat': 'file', 'outputPropertyName': 'data'}}
         params['options']['timeout'] = 120000
+    if url.endswith('/v1/setup') or url.endswith('/v1/preflight'):
+        params['options']['timeout'] = 120000
     return node(name, 'httpRequest', params, x, 4.2, retryOnFail=False)
 
 
@@ -66,7 +68,12 @@ story_form = form('Story Submission Form', 'Create a WonderTales video', 'wonder
     field('Target duration', ['30 seconds', '1 minute', '90 seconds', '2 minutes'], True),
     field('Flow account alias (blank uses flow-main)'), field('YouTube destination alias (blank uses channel-main)'),
     field('Consistency', ['Reference images', 'Text descriptions (less consistent)'], True),
+    field('Editor (blank uses built-in)', ['Built-in FFmpeg', 'MoneyPrinterTurbo']),
+    field('Subtitle style (MoneyPrinterTurbo only)', ['clean', 'kids']),
+    field('Licensed music path (optional; MoneyPrinterTurbo only)'),
+    field('Learning goal (optional)'), field('Rights / licence notes (optional)', kind='textarea'),
     field('Variant label (optional; change only for an intentional new version)')])
+story_form['parameters']['formDescription'] += ' Give the story an engaging opening, a clear problem and a satisfying ending. Use original or licensed characters/stories. Music paths point to the worker imports folder. Narration is spoken, not sung.'
 registry = {}
 for i in range(1, 11):
     for suffix in ('name', 'face_prompt', 'body_prompt', 'reference_image'):
@@ -106,6 +113,11 @@ return [{json:{title, story, language, aspectRatio, durationSeconds, variant,
  flowAccount:String(form['Flow account alias (blank uses flow-main)'] || 'flow-main').trim(),
  youtubeDestination:String(form['YouTube destination alias (blank uses channel-main)'] || 'channel-main').trim(),
  selectedCharacters:pool.slice(0,count), creditCostPerClip, maxCreditsPerJob,
+ editor:form['Editor (blank uses built-in)'] === 'MoneyPrinterTurbo' ? 'moneyprinterturbo' : 'builtin',
+ subtitleStyle:form['Subtitle style (MoneyPrinterTurbo only)'] || 'clean',
+ musicFile:String(form['Licensed music path (optional; MoneyPrinterTurbo only)'] || '').trim(),
+ learningGoal:String(form['Learning goal (optional)'] || '').trim(),
+ rightsNote:String(form['Rights / licence notes (optional)'] || '').trim(),
  consistencyMode:form.Consistency === 'Reference images' ? 'reference' : 'text',
  model:'veo-lite', uploadVisibility:'private', madeForKids:true}}];
 '''.strip(), 720)
@@ -122,7 +134,7 @@ save('WonderTales — Preflight (no video credits)', '02-preflight.json', check_
 
 status_form = form('Status Form', 'WonderTales jobs and setup', 'wondertales-status', [field('Job ID (blank lists recent jobs)')])
 status_http = http('Get Job Status', "={{ '"+BASE+"/v1/jobs' + ($json['Job ID (blank lists recent jobs)'] ? '/' + encodeURIComponent($json['Job ID (blank lists recent jobs)'].trim()) : '') }}", 240)
-status = code('Readable Status', "const data=$input.first().json; return (data.jobs || [data]).map(j=>({json:{jobId:j.id,title:j.body.title,state:j.state,progress:j.progress,detail:j.detail,flowAccount:j.body.flowAccount,destination:j.body.youtubeDestination,quality:j.report,nextAction:j.nextAction,privateYouTubeLink:j.youtubeUrl,scenes:j.scenes}}));", 480)
+status = code('Readable Status', "const data=$input.first().json; return (data.jobs || [data]).map(j=>({json:{jobId:j.id,title:j.body.title,state:j.state,progress:j.progress,detail:j.detail,flowAccount:j.body.flowAccount,destination:j.body.youtubeDestination,editor:j.body.editor || 'builtin',creditReport:j.creditReport,quality:j.report,nextAction:j.nextAction,privateYouTubeLink:j.youtubeUrl,scenes:j.scenes}}));", 480)
 save('WonderTales — Job Status', '03-job-status.json', [status_form,status_http,status])
 
 manage_form = form('Manage Job Form', 'Recover or resume WonderTales jobs', 'wondertales-manage', [
@@ -203,4 +215,75 @@ save('WonderTales — Daily Summary (in n8n)', '11-daily-summary.json',[summary_
 for filename in ('09-daily-queue-manager.json','11-daily-summary.json'):
  path=ROOT/filename
  data=json.loads(path.read_text()); data['settings']['timezone']='Asia/Kolkata'
+ path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+
+# Daily read-only analytics. Separate OAuth credentials, explicit channel ID, no revenue scopes.
+analytics_schedule=node('Refresh Analytics Daily', 'scheduleTrigger', {'rule':{'interval':[{'field':'cronExpression','expression':'0 9 * * *'}]}},0,1.2)
+analytics_config=fields_node('Analytics Destination (configure)', {'destination':'channel-main','expectedChannelId':''},240)
+analytics_identity=http('Verify Analytics Channel', 'https://www.googleapis.com/youtube/v3/channels?part=id,statistics&mine=true',480,google=True)
+analytics_guard=code('Guard Analytics Identity', r'''
+const c=$('Analytics Destination (configure)').first().json;
+if(!/^UC[A-Za-z0-9_-]{22}$/.test(c.expectedChannelId || '')) throw new Error('Configure the expected YouTube channel ID.');
+const ch=($input.first().json.items || []).find(x=>x.id===c.expectedChannelId);
+if(!ch) throw new Error('YouTube OAuth channel does not match this destination.');
+const s=ch.statistics || {};
+const subscriberCount=s.hiddenSubscriberCount || s.subscriberCount===undefined ? null : Number(s.subscriberCount);
+const end=new Date(); end.setUTCDate(end.getUTCDate()-2);
+const start=new Date(end); start.setUTCDate(start.getUTCDate()-27);
+return [{json:{destination:c.destination,channelId:c.expectedChannelId,subscriberCount,
+ startDate:start.toISOString().slice(0,10),endDate:end.toISOString().slice(0,10)}}];
+'''.strip(),720)
+analytics_local=http('List Managed Uploads',BASE+'/v1/analytics/jobs',960)
+analytics_ids=code('Select Latest 50 Uploads', r'''
+const c=$('Guard Analytics Identity').first().json;
+const ids=[...new Set(($input.first().json.jobs || []).filter(j=>j.destination===c.destination && j.youtubeId).map(j=>j.youtubeId))].slice(0,50);
+// A new channel with no managed uploads can still be checked using its channel statistics.
+return [{json:{...c,ids,videoStatusUrl:ids.length ? 'https://www.googleapis.com/youtube/v3/videos?part=id,status,snippet&id='+encodeURIComponent(ids.join(',')) : 'https://www.googleapis.com/youtube/v3/videos?part=id,status,snippet&id=00000000000'}}];
+'''.strip(),1200)
+analytics_status=http('Read Publication Status', '={{ $json.videoStatusUrl }}',1440,google=True)
+analytics_url=code('Build Read Only Analytics Query', r'''
+const c=$('Select Latest 50 Uploads').first().json;
+const videos=($input.first().json.items || []).map(v=>({id:v.id,channelId:v.snippet?.channelId,privacyStatus:v.status?.privacyStatus}));
+if(videos.some(v=>v.channelId!==c.channelId)) throw new Error('A managed video belongs to a different channel.');
+const query={ids:'channel=='+c.channelId,startDate:c.startDate,endDate:c.endDate,dimensions:'video',metrics:'views,estimatedMinutesWatched,averageViewPercentage,subscribersGained',sort:'-estimatedMinutesWatched',maxResults:'200'};
+const url='https://youtubeanalytics.googleapis.com/v2/reports?'+Object.entries(query).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+return [{json:{...c,videos,url}}];
+'''.strip(),1680)
+analytics_fetch=http('Read YouTube Analytics (read-only OAuth)', '={{ $json.url }}',1920)
+analytics_fetch['parameters']['genericAuthType']='oAuth2Api'
+analytics_parse=code('Normalize Analytics Snapshot',r'''
+const c=$('Build Read Only Analytics Query').first().json;
+const report=$input.first().json;
+if(report.error || !Array.isArray(report.columnHeaders)) throw new Error('YouTube Analytics returned an invalid report; previous snapshot is preserved.');
+const names=report.columnHeaders.map(h=>h.name);
+const required=['video','views','estimatedMinutesWatched','averageViewPercentage','subscribersGained'];
+if(required.some(k=>!names.includes(k))) throw new Error('Analytics columns changed. Update the integration before saving.');
+const rows=(report.rows || []).map(row=>Object.fromEntries(required.map(k=>[k,row[names.indexOf(k)]])));
+return [{json:{destination:c.destination,channelId:c.channelId,subscriberCount:c.subscriberCount,startDate:c.startDate,endDate:c.endDate,videos:c.videos,rows}}];
+'''.strip(),2160)
+analytics_save=http('Save Private Analytics Snapshot',BASE+'/v1/analytics/snapshot',2400,'POST','={{ $json }}')
+save('WonderTales — Daily YouTube Analytics', '12-youtube-analytics.json', [analytics_schedule,analytics_config,analytics_identity,analytics_guard,analytics_local,analytics_ids,analytics_status,analytics_url,analytics_fetch,analytics_parse,analytics_save])
+weekly=node('Weekly Review Monday 10 AM', 'scheduleTrigger', {'rule':{'interval':[{'field':'cronExpression','expression':'0 10 * * 1'}]}},0,1.2)
+manual_review=node('Review Performance Now', 'manualTrigger', {},0)
+review_http=http('Performance Credits Rights and Publication Report',BASE+'/v1/growth/report',240)
+save('WonderTales — Weekly Growth Review', '13-weekly-growth-review.json',[weekly,review_http])
+# Manual and scheduled triggers converge on the same report; never connect triggers together.
+path=ROOT/'13-weekly-growth-review.json'; data=json.loads(path.read_text())
+manual_review['position']=[0,220]; data['nodes'].append(manual_review)
+data['connections'][manual_review['name']]={'main':[[{'node':review_http['name'],'type':'main','index':0}]]}
+path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+review_nodes=json.loads(json.dumps([story_form,registry_node,config,prepare,queue]))
+review_nodes[0]['parameters']['path']='wondertales-story-review'
+review_nodes[0]['parameters']['formTitle']='WonderTales story similarity and rights notes — no generation'
+review_nodes[0]['webhookId']=str(uuid.uuid5(uuid.NAMESPACE_URL,'wondertales-story-review'))
+review_nodes[-1]['name']='Check Story Without Generating'
+review_nodes[-1]['parameters']['url']=BASE+'/v1/stories/check'
+save('WonderTales — Story Review (no credits)', '14-story-review.json',review_nodes)
+thumb_form=form('Thumbnail Preview Form','Preview a video frame for its thumbnail','wondertales-thumbnail',[
+ field('Job ID',required=True),field('Frame',['1','2','3'],True)])
+thumb_code=code('Choose Saved Thumbnail',"const f=$input.first().json; const id=String(f['Job ID']||'').trim(); if(!/^[a-f0-9]{32}$/.test(id) || !['1','2','3'].includes(f.Frame)) throw new Error('Enter a valid Job ID and choose a frame.'); return [{json:{id,frame:f.Frame}}];",240)
+thumb_http=http('Download Thumbnail Candidate',"={{ '"+BASE+"/v1/jobs/' + $json.id + '/thumbnail-' + $json.frame }}",480,download=True)
+save('WonderTales — Thumbnail Preview', '15-thumbnail-preview.json',[thumb_form,thumb_code,thumb_http])
+for filename in ('12-youtube-analytics.json','13-weekly-growth-review.json'):
+ path=ROOT/filename; data=json.loads(path.read_text()); data['settings']['timezone']='Asia/Kolkata'
  path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')

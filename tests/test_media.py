@@ -42,6 +42,7 @@ class MediaTests(unittest.TestCase):
             with patch('wondertales.core.shutil.which',side_effect=lambda x: '/fake/'+x if x in ('gflow','edge-tts') else original(x)):
                 pipe.execute(job['id'])
                 self.assertEqual(store.get(job['id'])['state'],'ready')
+                self.assertEqual(len(store.get(job['id'])['report']['thumbnailCandidates']),3)
                 self.assertEqual(len(calls),1)
                 pipe.execute(job['id'])
                 self.assertEqual(len(calls),1,'Assembly resume must not regenerate a completed clip')

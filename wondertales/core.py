@@ -24,8 +24,22 @@ class StopJob(Exception):
 
 def validate(body, settings):
     keys = {"title", "story", "language", "aspectRatio", "flowAccount", "youtubeDestination",
-            "durationSeconds", "selectedCharacters", "consistencyMode", "creditCostPerClip", "maxCreditsPerJob", "variant"}
+            "durationSeconds", "selectedCharacters", "consistencyMode", "creditCostPerClip", "maxCreditsPerJob", "variant",
+            "editor", "subtitleStyle", "musicFile", "musicVolume", "learningGoal", "rightsNote"}
     b = {k: v for k, v in body.items() if k in keys}
+    b.setdefault('editor', 'builtin')
+    b.setdefault('subtitleStyle', 'clean')
+    if b['editor'] not in ('builtin', 'moneyprinterturbo') or b['subtitleStyle'] not in ('clean', 'kids'):
+        raise ValueError('Choose a supported editor and subtitle style')
+    for key in ('musicFile', 'learningGoal', 'rightsNote', 'variant'):
+        if key in b and (not isinstance(b[key], str) or len(b[key]) > 2000):
+            raise ValueError(f'Use text up to 2000 characters for {key}')
+    volume = b.get('musicVolume', 0.12)
+    if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not math.isfinite(volume) or not 0 < volume <= 0.3:
+        raise ValueError('Music volume must be greater than zero and at most 0.3')
+    b['musicVolume'] = volume
+    if b['editor'] == 'builtin' and (b.get('musicFile') or b['subtitleStyle'] != 'clean'):
+        raise ValueError('Select MoneyPrinterTurbo to use music or kids subtitle styling')
     for key in ('title', 'story', 'language', 'aspectRatio', 'flowAccount', 'youtubeDestination'):
         if not isinstance(b.get(key), str) or not b[key].strip():
             raise ValueError(f'{key} is required')
@@ -221,10 +235,10 @@ class Store:
                        (video_id, time.time(), time.time(), ident))
 
 
-def run(args, *, cwd=None, timeout=180):
+def run(args, *, cwd=None, timeout=180, env=None):
     """Never use shell=True; never include raw provider output in persistent job logs."""
     return subprocess.run([str(a) for a in args], cwd=cwd, capture_output=True,
-                          text=True, timeout=timeout, check=False)
+                          text=True, timeout=timeout, check=False, env=env)
 
 
 def probe(path):
@@ -278,7 +292,10 @@ class Pipeline:
         except (ValueError, KeyError, TypeError):
             raise StopJob('blocked_balance', 'Flow did not return a verifiable balance. Check account/CLI compatibility before Safe Resume; no generation was submitted.')
 
-    def preflight(self, body, remaining=None):
+    def preflight(self, body, remaining=None, *, check_editor=True):
+        if check_editor:
+            from .editor import preflight
+            preflight(body, self.settings, self.state_dir)
         account = {'profile': body.get('flowProfile') or self.settings['accounts'][body['flowAccount']]['profile'],
                    'project': body.get('flowProject', '')}
         if not isinstance(account.get('profile'), str) or not re.fullmatch(r'[A-Za-z0-9_-]+', account['profile']):
@@ -310,6 +327,12 @@ class Pipeline:
         work.mkdir(parents=True, exist_ok=True)
         self.store.update(ident, 'preflight', 'Checking tools, references, and Flow balance.')
         pending = [s for s in job['scenes'] if s['state'] != 'done']
+        from .growth import story_check
+        check = story_check(body, self.store.list(limit=None), ident)
+        if check['similarJobs'] and not body.get('variant', '').strip() and pending:
+            raise StopJob('needs_attention', 'This story closely repeats an earlier story. Archive it and submit an original story, or use an explicit Variant label for an intentional new version. No new clips were submitted.')
+        from .editor import preflight as editor_preflight
+        editor_preflight(body, self.settings, self.state_dir)
         required = ['ffmpeg', 'ffprobe']
         if pending:
             required.append('gflow')
@@ -319,7 +342,7 @@ class Pipeline:
             if not shutil.which(binary):
                 raise StopJob('needs_setup', f'Install the missing tool: {binary}')
         pending = [s for s in job['scenes'] if s['state'] != 'done']
-        account, refs = self.preflight(body, len(pending)) if pending else (self.settings['accounts'][body['flowAccount']], [])
+        account, refs = self.preflight(body, len(pending), check_editor=False) if pending else (self.settings['accounts'][body['flowAccount']], [])
         self.store.update(ident, 'narrating', 'Preparing one consistent narration and timed captions before spending Flow credits.')
         audio, captions = work/'narration.mp3', work/'captions.srt'
         if not audio.exists() or not captions.exists():
@@ -344,7 +367,7 @@ class Pipeline:
             if scene['state'] != 'done':
                 if self.store.is_paused():
                     raise StopJob('paused', 'Paused at a safe scene boundary. Completed clips are preserved.')
-                self.preflight(body, sum(s['state'] != 'done' for s in self.store.get(ident)['scenes']))
+                self.preflight(body, sum(s['state'] != 'done' for s in self.store.get(ident)['scenes']), check_editor=False)
                 segment = ' '.join(words[len(words)*n//total:len(words)*(n+1)//total])
                 identities = '\n'.join(f"{c['name']}: {c['facePrompt']}; {c['bodyPrompt']}" for c in body['selectedCharacters'])
                 prompt = (f'Child-friendly polished 3D animation for ages 8 to 10. Scene {n+1} of {total}. '
@@ -391,7 +414,12 @@ class Pipeline:
         self.store.update(ident, 'assembling', 'Assembling saved clips, narration, and timed captions.', progress=80)
         (work/'concat.txt').write_text(''.join(f"file '{p.name}'\n" for p in normalized))
         final = work/'final.mp4'
-        result = self.command(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '1', '-i', 'concat.txt',
+        if body.get('editor', 'builtin') == 'moneyprinterturbo':
+            from .editor import render
+            render(body, self.settings, self.state_dir, work, self.command)
+            result = subprocess.CompletedProcess([], 0)
+        else:
+            result = self.command(['ffmpeg', '-v', 'error', '-y', '-f', 'concat', '-safe', '1', '-i', 'concat.txt',
                                '-i', 'narration.mp3', '-map', '0:v', '-map', '1:a', '-vf', 'subtitles=captions.srt',
                                '-af', 'apad,loudnorm=I=-16:TP=-1.5:LRA=11', '-t', str(body['durationSeconds']),
                                '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart',
@@ -408,5 +436,21 @@ class Pipeline:
         if levels.returncode or not level or level.group(1) == '-inf' or float(level.group(1)) < -50:
             raise StopJob('needs_attention', 'Narration appears silent or could not be measured. Review audio before uploading.')
         report.update(captions='timed and burned in', consistency=body.get('consistencyMode', 'reference'),
-                      narration='spoken, not sung', finalFile='final.mp4')
+                      narration='spoken, not sung', finalFile='final.mp4',
+                      editor=body.get('editor', 'builtin'), storyReview=check,
+                      music='owner-supplied local file' if body.get('musicFile') else 'none')
+        report['titleSuggestions'] = [body['title']]
+        if body.get('learningGoal', '').strip():
+            report['titleSuggestions'].append((body['title']+' | '+body['learningGoal'].strip())[:100])
+        report['thumbnailCandidates'] = []
+        for index, fraction in enumerate((0.2, 0.5, 0.8), 1):
+            target = work/f'thumbnail-{index}.jpg'
+            try:
+                frame = self.command(['ffmpeg', '-v', 'error', '-y', '-ss', str(body['durationSeconds']*fraction),
+                                      '-i', final, '-frames:v', '1', '-q:v', '2', target], timeout=60)
+                if frame.returncode == 0 and target.is_file():
+                    report['thumbnailCandidates'].append({'frame': index, 'url': f'/v1/jobs/{ident}/thumbnail-{index}'})
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        report['thumbnailNote'] = 'Saved video frames for owner selection; no automatic thumbnail upload. Shorts thumbnail selection depends on YouTube app support.'
         self.store.update(ident, 'ready', 'Quality checks passed. Ready for private YouTube upload.', progress=95, report=report)

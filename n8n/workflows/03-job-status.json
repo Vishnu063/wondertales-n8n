@@ -58,7 +58,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const data=$input.first().json; return (data.jobs || [data]).map(j=>({json:{jobId:j.id,title:j.body.title,state:j.state,progress:j.progress,detail:j.detail,flowAccount:j.body.flowAccount,destination:j.body.youtubeDestination,quality:j.report,nextAction:j.nextAction,privateYouTubeLink:j.youtubeUrl,scenes:j.scenes}}));"
+        "jsCode": "const data=$input.first().json; return (data.jobs || [data]).map(j=>({json:{jobId:j.id,title:j.body.title,state:j.state,progress:j.progress,detail:j.detail,flowAccount:j.body.flowAccount,destination:j.body.youtubeDestination,editor:j.body.editor || 'builtin',creditReport:j.creditReport,quality:j.report,nextAction:j.nextAction,privateYouTubeLink:j.youtubeUrl,scenes:j.scenes}}));"
       }
     }
   ],
