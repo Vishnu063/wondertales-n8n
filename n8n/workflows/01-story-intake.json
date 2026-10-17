@@ -89,62 +89,242 @@
         "assignments": {
           "assignments": [
             {
-              "id": "character-01",
-              "name": "character_01",
+              "id": "character-01-name",
+              "name": "character_01_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-02",
-              "name": "character_02",
+              "id": "character-01-face_prompt",
+              "name": "character_01_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-03",
-              "name": "character_03",
+              "id": "character-01-body_prompt",
+              "name": "character_01_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-04",
-              "name": "character_04",
+              "id": "character-01-voice",
+              "name": "character_01_voice",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-05",
-              "name": "character_05",
+              "id": "character-02-name",
+              "name": "character_02_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-06",
-              "name": "character_06",
+              "id": "character-02-face_prompt",
+              "name": "character_02_face_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-07",
-              "name": "character_07",
+              "id": "character-02-body_prompt",
+              "name": "character_02_body_prompt",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-08",
-              "name": "character_08",
+              "id": "character-02-voice",
+              "name": "character_02_voice",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-09",
-              "name": "character_09",
+              "id": "character-03-name",
+              "name": "character_03_name",
               "value": "",
               "type": "string"
             },
             {
-              "id": "character-10",
-              "name": "character_10",
+              "id": "character-03-face_prompt",
+              "name": "character_03_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-03-body_prompt",
+              "name": "character_03_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-03-voice",
+              "name": "character_03_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-04-name",
+              "name": "character_04_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-04-face_prompt",
+              "name": "character_04_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-04-body_prompt",
+              "name": "character_04_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-04-voice",
+              "name": "character_04_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-05-name",
+              "name": "character_05_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-05-face_prompt",
+              "name": "character_05_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-05-body_prompt",
+              "name": "character_05_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-05-voice",
+              "name": "character_05_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-06-name",
+              "name": "character_06_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-06-face_prompt",
+              "name": "character_06_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-06-body_prompt",
+              "name": "character_06_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-06-voice",
+              "name": "character_06_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-07-name",
+              "name": "character_07_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-07-face_prompt",
+              "name": "character_07_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-07-body_prompt",
+              "name": "character_07_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-07-voice",
+              "name": "character_07_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-08-name",
+              "name": "character_08_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-08-face_prompt",
+              "name": "character_08_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-08-body_prompt",
+              "name": "character_08_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-08-voice",
+              "name": "character_08_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-09-name",
+              "name": "character_09_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-09-face_prompt",
+              "name": "character_09_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-09-body_prompt",
+              "name": "character_09_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-09-voice",
+              "name": "character_09_voice",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-10-name",
+              "name": "character_10_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-10-face_prompt",
+              "name": "character_10_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-10-body_prompt",
+              "name": "character_10_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-10-voice",
+              "name": "character_10_voice",
               "value": "",
               "type": "string"
             }
@@ -165,7 +345,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "const form = $('Story Submission Form').first().json;\nconst registry = $('Character Registry (edit in n8n)').first().json;\nconst characterPool = Object.entries(registry)\n  .filter(([key, value]) => key.startsWith('character_') && typeof value === 'string' && value.trim())\n  .map(([, value]) => value.trim());\n\nif (characterPool.length < 2) {\n  throw new Error('Add at least two character names in the Character Registry node before submitting a story.');\n}\n\nconst language = String(form['Language'] || '').trim();\nconst formatChoice = String(form['Video format'] || '').trim();\nconst durationChoice = String(form['Target duration'] || '').trim();\nconst title = String(form['Story title'] || '').trim();\nconst story = String(form['Story / poem / rhyme'] || '').trim();\n\nif (!title || !story) throw new Error('Story title and story text are required.');\nif (!['English', 'Hindi'].includes(language)) throw new Error('Choose English or Hindi.');\nif (!['9:16 vertical', '16:9 landscape'].includes(formatChoice)) throw new Error('Choose a supported video format.');\n\nconst durationSeconds = {\n  '30 seconds': 30,\n  '1 minute': 60,\n  '90 seconds': 90,\n  '2 minutes': 120\n}[durationChoice];\nif (!durationSeconds) throw new Error('Choose a supported duration.');\n\nconst shuffled = [...characterPool];\nfor (let i = shuffled.length - 1; i > 0; i--) {\n  const j = Math.floor(Math.random() * (i + 1));\n  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\n}\nconst desiredCount = Math.random() < 0.5 ? 2 : 3;\nconst selectedCharacters = shuffled.slice(0, Math.min(desiredCount, shuffled.length));\nconst plannedSceneCount = Math.ceil(durationSeconds / 8);\n\nreturn {\n  json: {\n    requestId: String($execution.id),\n    title,\n    story,\n    language,\n    aspectRatio: formatChoice.startsWith('9:16') ? '9:16' : '16:9',\n    durationSeconds,\n    model: 'veo-lite',\n    plannedSceneCount,\n    selectedCharacters,\n    uploadVisibility: 'private'\n  }\n};"
+        "jsCode": "const form = $('Story Submission Form').first().json;\nconst registry = $('Character Registry (edit in n8n)').first().json;\nconst characterPool = Array.from({ length: 10 }, (_, index) => {\n  const slot = String(index + 1).padStart(2, '0');\n  const name = String(registry[`character_${slot}_name`] || '').trim();\n  const facePrompt = String(registry[`character_${slot}_face_prompt`] || '').trim();\n  const bodyPrompt = String(registry[`character_${slot}_body_prompt`] || '').trim();\n  const voice = String(registry[`character_${slot}_voice`] || '').trim();\n  return { name, facePrompt, bodyPrompt, voice };\n}).filter(character => character.name && character.facePrompt && character.bodyPrompt);\n\nif (characterPool.length < 2) {\n  throw new Error('Fill in at least two characters with a name, face description, and body/clothing description in the Character Registry node.');\n}\n\nconst language = String(form['Language'] || '').trim();\nconst formatChoice = String(form['Video format'] || '').trim();\nconst durationChoice = String(form['Target duration'] || '').trim();\nconst title = String(form['Story title'] || '').trim();\nconst story = String(form['Story / poem / rhyme'] || '').trim();\n\nif (!title || !story) throw new Error('Story title and story text are required.');\nif (!['English', 'Hindi'].includes(language)) throw new Error('Choose English or Hindi.');\nif (!['9:16 vertical', '16:9 landscape'].includes(formatChoice)) throw new Error('Choose a supported video format.');\n\nconst durationSeconds = {\n  '30 seconds': 30,\n  '1 minute': 60,\n  '90 seconds': 90,\n  '2 minutes': 120\n}[durationChoice];\nif (!durationSeconds) throw new Error('Choose a supported duration.');\n\nconst shuffled = [...characterPool];\nfor (let i = shuffled.length - 1; i > 0; i--) {\n  const j = Math.floor(Math.random() * (i + 1));\n  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\n}\nconst desiredCount = Math.random() < 0.5 ? 2 : 3;\nconst selectedCharacters = shuffled.slice(0, Math.min(desiredCount, shuffled.length));\nconst plannedSceneCount = Math.ceil(durationSeconds / 8);\n\nreturn {\n  json: {\n    requestId: String($execution.id),\n    title,\n    story,\n    language,\n    aspectRatio: formatChoice.startsWith('9:16') ? '9:16' : '16:9',\n    durationSeconds,\n    model: 'veo-lite',\n    plannedSceneCount,\n    selectedCharacters: selectedCharacters.map(character => ({ ...character, identity: 'entity' })),\n    uploadVisibility: 'private'\n  }\n};"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
