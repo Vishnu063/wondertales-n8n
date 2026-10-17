@@ -17,6 +17,10 @@ A self-hosted workflow for turning **your own children’s stories, poems, or nu
 - `n8n/workflows/01-story-intake.json` — importable n8n intake workflow. It collects and validates a submission, selects 2–3 characters, and hands it to the local generator service.
 - This first workflow is the intake layer. The local generation service and YouTube upload workflow are the next implementation steps; the endpoint in the workflow is a local placeholder until that service is added.
 
+## Credit-aware generation
+
+The chosen Veo 3.1 Lite workflow uses multiple short scenes for longer videos, then assembles and trims them to the requested runtime. Longer targets require more generations and may exceed the credits currently available in Flow. The generation service must check the current Flow balance and show a cost estimate before it submits any scenes; it must not retry a billed generation automatically.
+
 ## Planned flow
 
 1. Submit story and choose language, format, and duration in n8n.
