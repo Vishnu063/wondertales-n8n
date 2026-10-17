@@ -1,0 +1,114 @@
+{
+  "name": "WonderTales — Pause Resume and Summary",
+  "nodes": [
+    {
+      "id": "14899fdc-77b6-5688-a9aa-a616005f550a",
+      "name": "Queue Controls Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "wondertales-queue-controls",
+        "formTitle": "WonderTales queue controls",
+        "formDescription": "Use n8n execution results to see status and errors. All uploads remain Private.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Action",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Pause everything"
+                  },
+                  {
+                    "option": "Resume everything"
+                  },
+                  {
+                    "option": "Check queue now"
+                  },
+                  {
+                    "option": "Show daily summary"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "de9d5ba7-7ef0-5610-963b-770ebb6b0a67"
+    },
+    {
+      "id": "53f49d35-3594-58c9-bb9e-db9b84a06909",
+      "name": "Prepare Queue Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const action={'Pause everything':'pause','Resume everything':'resume','Check queue now':'tick','Show daily summary':'summary'}[$input.first().json.Action]; if(!action) throw new Error('Choose a queue action.'); return [{json:{action}}];"
+      }
+    },
+    {
+      "id": "e1889dab-fe11-5c7d-9d77-0e71af060505",
+      "name": "Apply Queue Command",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/queue/command",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Queue Controls Form": {
+      "main": [
+        [
+          {
+            "node": "Prepare Queue Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Queue Command": {
+      "main": [
+        [
+          {
+            "node": "Apply Queue Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

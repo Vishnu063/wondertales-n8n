@@ -27,3 +27,16 @@
 7. Test a safe assembly resume without making another Flow generation. Configure further accounts/channels only after the first complete run works.
 
 Do not claim the project is production-ready until these owner-account checks have passed. No additional questions are required to finish the code; account sign-in and real output review require the owner.
+
+
+## Added queue and stress-reduction controls
+
+- **Story bank:** single submissions and up to 30-story batches wait durably; batch validation finishes before any rows are inserted.
+- **Rule-based queue manager:** one managed job per local calendar day, default Asia/Kolkata; durable daily reservations, no catch-up bursts, no paid AI dependency.
+- **Automatic waiting:** insufficient-credit jobs get a new balance check after at least one hour; login, CAPTCHA, and uncertain billing still need manual resolution.
+- **Needs You:** each blocking state has a clear next action in job status and the daily summary.
+- **Daily summary:** on-demand and scheduled at 8 PM in n8n; completed, uploaded, waiting, and failure counts. No messages are sent to anyone.
+- **Pause/resume everything:** durable global pause holds new scenes and upload claims, preserving completed clips and allowing an in-flight operation to finish. All resumes still obey the daily queue.
+- **Archive:** stopped stories can be archived without deleting paid clips/history; uncertain uploads must be reconciled first.
+
+The added workflows are 08 Story Bank, 09 Daily Queue Manager, 10 Queue Controls, and 11 Daily Summary. All exports remain inactive by default. Enable 09 for automatic dispatch; the worker alone does not release new jobs. Owner-account live validation is still pending.

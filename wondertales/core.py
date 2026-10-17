@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import math
 import os
@@ -80,7 +82,31 @@ class Store:
                 CREATE TABLE IF NOT EXISTS scenes (
                   job TEXT NOT NULL, number INTEGER NOT NULL, state TEXT NOT NULL,
                   path TEXT, media_id TEXT, PRIMARY KEY(job, number));
+                CREATE TABLE IF NOT EXISTS controls (id INTEGER PRIMARY KEY CHECK(id=1), paused INTEGER NOT NULL DEFAULT 0);
+                INSERT OR IGNORE INTO controls(id,paused) VALUES(1,0);
+                CREATE TABLE IF NOT EXISTS daily_dispatches (day TEXT PRIMARY KEY, job TEXT NOT NULL);
             ''')
+            columns = {row[1] for row in db.execute('PRAGMA table_info(jobs)')}
+            for name, definition in [('retry_after','REAL NOT NULL DEFAULT 0'), ('ready_at','REAL'), ('uploaded_at','REAL')]:
+                if name not in columns:
+                    db.execute(f'ALTER TABLE jobs ADD COLUMN {name} {definition}')
+
+    def is_paused(self):
+        with self.connect() as db:
+            return bool(db.execute('SELECT paused FROM controls WHERE id=1').fetchone()[0])
+
+    def set_paused(self, paused):
+        with self.connect() as db:
+            db.execute('UPDATE controls SET paused=? WHERE id=1', (int(paused),))
+
+    def reserve_day(self, day, ident):
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            row = db.execute('SELECT job FROM daily_dispatches WHERE day=?', (day,)).fetchone()
+            if row:
+                return row[0] == ident
+            db.execute('INSERT INTO daily_dispatches(day,job) VALUES(?,?)', (day,ident))
+            return True
 
     def connect(self):
         db = sqlite3.connect(self.path, timeout=15)
@@ -99,35 +125,44 @@ class Store:
                 'SELECT number,state,path,media_id FROM scenes WHERE job=? ORDER BY number', (ident,))]
         return job
 
-    def list(self):
+    def list(self, limit=100):
         with self.connect() as db:
-            ids = [x[0] for x in db.execute('SELECT id FROM jobs ORDER BY created DESC LIMIT 100')]
+            query = 'SELECT id FROM jobs ORDER BY created DESC'
+            ids = [x[0] for x in db.execute(query if limit is None else query+' LIMIT ?', () if limit is None else (limit,))]
         return [self.get(x) for x in ids]
 
     def submit(self, body):
-        fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-        ident = uuid.uuid4().hex
+        return self.submit_many([body])[0]
+
+    def submit_many(self, bodies):
+        results = []
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
-            previous = db.execute('SELECT id FROM jobs WHERE fingerprint=?', (fingerprint,)).fetchone()
-            if previous:
-                return self.get(previous[0]), False
-            db.execute('INSERT INTO jobs(id,fingerprint,body,state,created,updated) VALUES(?,?,?,?,?,?)',
-                       (ident, fingerprint, json.dumps(body), 'queued', time.time(), time.time()))
-            db.executemany('INSERT INTO scenes(job,number,state) VALUES(?,?,?)',
-                           [(ident, n, 'pending') for n in range(body['plannedSceneCount'])])
-        return self.get(ident), True
+            for body in bodies:
+                fingerprint = hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+                previous = db.execute('SELECT id FROM jobs WHERE fingerprint=?', (fingerprint,)).fetchone()
+                if previous:
+                    results.append((previous[0], False))
+                    continue
+                ident = uuid.uuid4().hex
+                db.execute('INSERT INTO jobs(id,fingerprint,body,state,detail,created,updated) VALUES(?,?,?,?,?,?,?)',
+                           (ident, fingerprint, json.dumps(body), 'waiting', 'Saved in the story bank; waiting for the daily queue.', time.time(), time.time()))
+                db.executemany('INSERT INTO scenes(job,number,state) VALUES(?,?,?)',
+                               [(ident, n, 'pending') for n in range(body['plannedSceneCount'])])
+                results.append((ident, True))
+        return [(self.get(ident),created) for ident,created in results]
 
     def update(self, ident, state, detail='', **extra):
-        allowed = {'progress', 'report'}
+        allowed = {'progress', 'report', 'retry_after'}
         if set(extra) - allowed:
             raise ValueError('Unsupported job fields')
         values = {'state': state, 'detail': detail, 'updated': time.time(), **extra}
         if 'report' in values:
             values['report'] = json.dumps(values['report'])
         with self.connect() as db:
-            db.execute('UPDATE jobs SET '+','.join(f'{k}=?' for k in values)+' WHERE id=?',
-                       [*values.values(), ident])
+            clause = ',ready_at=COALESCE(ready_at,?)' if state == 'ready' else ''
+            args = [*values.values()] + ([time.time()] if state == 'ready' else []) + [ident]
+            db.execute('UPDATE jobs SET '+','.join(f'{k}=?' for k in values)+clause+' WHERE id=?', args)
 
     def scene(self, ident, number, state, path=None, media_id=None):
         with self.connect() as db:
@@ -140,11 +175,14 @@ class Store:
             db.execute("UPDATE jobs SET state='upload_uncertain',detail='Check YouTube and record the existing video ID; do not upload again.' WHERE state='uploading'")
             db.execute("UPDATE jobs SET state='queued' WHERE state IN ('preflight','narrating','generating','assembling','checking')")
             db.execute("UPDATE jobs SET state='needs_reconciliation',detail='A scene may already have been billed. Recover the existing clip before resuming.' WHERE id IN (SELECT job FROM scenes WHERE state='uncertain') AND state!='uploaded'")
-        return [j['id'] for j in self.list() if j['state'] == 'queued']
+            db.execute("UPDATE jobs SET state='waiting' WHERE state='queued'")
+        return []  # Scheduling always goes through the durable daily queue after a restart.
 
     def claim_upload(self, ident, destination):
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
+            if db.execute('SELECT paused FROM controls WHERE id=1').fetchone()[0]:
+                raise ValueError('Global pause is active; new uploads are paused too')
             row = db.execute('SELECT state,body FROM jobs WHERE id=?', (ident,)).fetchone()
             if not row:
                 raise KeyError(ident)
@@ -152,6 +190,11 @@ class Store:
                 raise ValueError('Wrong upload destination')
             if row['state'] != 'ready':
                 raise ValueError('Job is not ready or its upload is already claimed')
+            day = datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat()
+            reserved = db.execute('SELECT job FROM daily_dispatches WHERE day=?',(day,)).fetchone()
+            if reserved and reserved[0] != ident:
+                raise ValueError('Another video owns today’s daily slot; this private upload waits for the next day')
+            db.execute('INSERT OR IGNORE INTO daily_dispatches(day,job) VALUES(?,?)',(day,ident))
             claim = uuid.uuid4().hex
             db.execute("UPDATE jobs SET state='uploading',claim=?,updated=? WHERE id=?",
                        (claim, time.time(), ident))
@@ -172,8 +215,10 @@ class Store:
                 return
             if row['state'] not in ('uploading', 'upload_uncertain') or (not reconcile and row['claim'] != claim):
                 raise ValueError('Invalid upload claim or state')
-            db.execute("UPDATE jobs SET state='uploaded',youtube_id=?,detail='',progress=100,updated=? WHERE id=?",
-                       (video_id, time.time(), ident))
+            day = datetime.now(ZoneInfo('Asia/Kolkata')).date().isoformat()
+            db.execute('INSERT OR IGNORE INTO daily_dispatches(day,job) VALUES(?,?)',(day,ident))
+            db.execute("UPDATE jobs SET state='uploaded',youtube_id=?,detail='',progress=100,uploaded_at=?,updated=? WHERE id=?",
+                       (video_id, time.time(), time.time(), ident))
 
 
 def run(args, *, cwd=None, timeout=180):
@@ -231,7 +276,7 @@ class Pipeline:
                 raise ValueError()
             return credits
         except (ValueError, KeyError, TypeError):
-            raise StopJob('blocked_credit', 'Flow did not return a verifiable balance. No generation was submitted.')
+            raise StopJob('blocked_balance', 'Flow did not return a verifiable balance. Check account/CLI compatibility before Safe Resume; no generation was submitted.')
 
     def preflight(self, body, remaining=None):
         account = {'profile': body.get('flowProfile') or self.settings['accounts'][body['flowAccount']]['profile'],
@@ -255,6 +300,8 @@ class Pipeline:
         return account, refs
 
     def execute(self, ident):
+        if self.store.is_paused():
+            raise StopJob('paused', 'Global pause is active. Saved clips are preserved; Resume Everything will restart safe work.')
         job = self.store.get(ident)
         body = job['body']
         if any(s['state'] in ('generating', 'uncertain') for s in job['scenes']):
@@ -295,6 +342,8 @@ class Pipeline:
             if scene['state'] == 'done' and not clip.is_file():
                 raise StopJob('needs_reconciliation', 'A completed clip is missing. Restore that file; it will not be regenerated automatically.')
             if scene['state'] != 'done':
+                if self.store.is_paused():
+                    raise StopJob('paused', 'Paused at a safe scene boundary. Completed clips are preserved.')
                 self.preflight(body, sum(s['state'] != 'done' for s in self.store.get(ident)['scenes']))
                 segment = ' '.join(words[len(words)*n//total:len(words)*(n+1)//total])
                 identities = '\n'.join(f"{c['name']}: {c['facePrompt']}; {c['bodyPrompt']}" for c in body['selectedCharacters'])
@@ -309,6 +358,8 @@ class Pipeline:
                     args += ['--project', account['project']]
                 for ref in refs:
                     args += ['--ref', ref]
+                if self.store.is_paused():
+                    raise StopJob('paused', 'Paused before submitting the next paid scene.')
                 # Commit the billing boundary BEFORE calling the provider.
                 self.store.scene(ident, n, 'generating')
                 self.store.update(ident, 'generating', f'Generating scene {n+1}/{total}. Keep the spare Chrome window open.', progress=int(n/total*75))

@@ -2,7 +2,7 @@
 
 Turn your own children's stories, poems, and spoken nursery rhymes into animated videos, then upload them to YouTube as **Private**. Manage submissions, character profiles, credit caps, job status, recovery, and destination selection through n8n.
 
-**Status:** local worker and seven n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
+**Status:** local worker and eleven n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
 
 ## What it does
 
@@ -48,7 +48,7 @@ This is the recommended first setup. macOS and Linux are supported; Windows can 
    ```
 
 5. Open `http://localhost:5678`, create your local n8n owner login, and import the JSON files under `n8n/workflows/`.
-6. Configure the local header credential, character registry, credit settings, and YouTube destination as described below. Run Setup Diagnostics and Preflight before enabling private uploads.
+6. Configure the local header credential, character registry, credit settings, and YouTube destination as described below. Run Setup Diagnostics and Preflight, then enable Daily Queue Manager and the configured private-upload workflow when ready for the first real test.
 
 ## One-time n8n connections
 
@@ -66,13 +66,17 @@ This is the recommended first setup. macOS and Linux are supported; Windows can 
 
 | Workflow | Purpose |
 | --- | --- |
-| 01 Story Intake | Story, language, format, duration, account aliases, cast, credit cap; queues a video job |
+| 01 Story Intake | Story, language, format, duration, account aliases, cast, credit cap; saves a story for the daily queue |
 | 02 Preflight | Check references, account/balance access, and estimated credits without generating video |
 | 03 Job Status | Enter a job ID, or leave blank to see recent jobs, progress, errors, and private YouTube links |
 | 04 Job Recovery | Resume safe steps, attach a recovered scene clip, or record the ID of an already-uploaded YouTube video |
 | 05 Private YouTube Upload | Once enabled, checks for one ready job each minute and uploads it privately to its configured channel |
 | 06 Setup Diagnostics | Checks installed tools and configured account aliases without generating media |
 | 07 Manage Account Aliases | Registers private Flow profile mappings and YouTube destination aliases without editing files |
+| 08 Story Bank | Submit up to 30 titled stories together, using common language/format/cast settings |
+| 09 Daily Queue Manager | Once enabled, checks every five minutes and releases at most one managed video job per local day |
+| 10 Queue Controls | Pause everything, resume, run a queue check, or view the summary |
+| 11 Daily Summary | Once enabled, records a summary at 8 PM Asia/Kolkata in n8n execution results; sends no messages |
 
 Use the n8n execution data view to see outputs and detailed errors. These are workflow forms and execution results, not a separate custom dashboard. Save the returned job ID after submission.
 
@@ -80,9 +84,33 @@ Use the n8n execution data view to see outputs and detailed errors. These are wo
 
 The local worker's token, account mappings, SQLite jobs, clips, narration, captions, and browser sessions remain outside the repository. Do not export n8n credentials. Back up the private state and n8n credential encryption configuration securely if you need recovery after disk loss.
 
+## Less work each day: the story bank and queue manager
+
+Submissions now enter a durable **story bank** rather than starting a paid generation immediately. Import and enable workflow **09 Daily Queue Manager** to process the queue; it checks every five minutes. The worker and n8n must remain running. Missed days do not trigger a burst of catch-up videos.
+
+The default is **one managed video job per Asia/Kolkata calendar day, across all accounts**. Its daily reservation persists across worker restarts and n8n retries. Safe resumes of that same job can use its existing daily slot. A previous video still awaiting private upload holds the queue; upload claims also reserve the local day's slot, so an old ready video cannot be uploaded and followed by another new video on the same day. A failed attempt may use the day's slot even if the video could not be completed; there is no promise of a successful video every day. Do not enable two different scheduling systems against the same worker.
+
+Use workflow **08 Story Bank** to submit multiple stories. Put a title on the first line of each block, story text below it, and separate stories with a line containing only `---`. Language, format, duration, credit cap, and character pool apply to the whole batch; submit Hindi and English batches separately if needed. Fill the registry/credit nodes on this workflow too. All batch entries are validated before anything is saved. Repeated stories are deduplicated. The existing single-story form still works and uses the same daily queue.
+
+Example story-bank format:
+
+```text
+A little star
+Two friends find a fallen star and help it return home.
+---
+The missing kite
+Two friends follow a colourful kite and help its owner.
+```
+
+Use workflow **10 Queue Controls** for Pause Everything, Resume Everything, Check Queue Now, and Show Daily Summary. Global pause survives a restart, stops new uploads and new scene submissions, and preserves saved clips. It does not kill a clip or upload already in progress; that operation may finish, then new work remains held. Resume Everything performs one queue check; workflow 09 must remain enabled for future automatic checks.
+
+If credits are insufficient, the queue waits and checks that job again no sooner than one hour after the failure. Every retry checks the balance before any new video generation. Unknown login/balance failures, CAPTCHA/provider failures, and uncertain billing or uploads require owner action and are **never** automatically retried. Status and summaries show a **Needs You** list with a problem and one clear next action. You can archive a stopped unusable story in Job Recovery; this preserves its clips and history instead of deleting them.
+
+Workflow **11 Daily Summary** records completed-video/private-upload counts, waiting jobs, failure states, and Needs You actions in n8n at 8 PM India time. Its schedule can be edited in n8n. It does not email, send messages, or use ChatGPT usage. The same summary is available on demand through Queue Controls. This queue manager is rule-based, not an AI agent, and adds no paid model or API key. Story-planning AI remains optional and is not included.
+
 ## Failures and recovery
 
-- A completed clip is never regenerated automatically. Safe Resume reuses existing completed clips and rebuilds remaining work.
+- A completed clip is never regenerated automatically. Safe Resume returns the job to the daily queue, which reuses completed clips and rebuilds remaining safe work without bypassing the global pause or daily cap.
 - A provider call is marked `generating` in SQLite **before** launch. If the result or download is uncertain, the scene becomes `uncertain`; a restart cannot silently charge for it again.
 - If a scene is uncertain, check Flow yourself. Download the existing clip into `imports`, then use Job Recovery with its zero-based scene index and file path. Resume after recovery. A lost or unfindable billed result may require manual investigation; there is no automatic paid retry.
 - If Flow proves that an uncertain scene was **never submitted**, Job Recovery has an explicit operator-only confirmation action. Wait for any in-flight operation to finish, check Flow carefully, then type `NOT_SUBMITTED` for that scene. This merely unlocks a later Safe Resume; it does not generate automatically. Never use it for a billed or still-running scene.

@@ -1,0 +1,64 @@
+{
+  "name": "WonderTales — Daily Summary (in n8n)",
+  "nodes": [
+    {
+      "id": "44c8eb29-793b-58c1-b426-159b4f471cfd",
+      "name": "Daily Summary at 8 PM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 20 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "8b7404e6-3c8d-5e88-80f6-543d8569f08b",
+      "name": "Daily Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/queue/summary",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Daily Summary at 8 PM": {
+      "main": [
+        [
+          {
+            "node": "Daily Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  },
+  "tags": []
+}

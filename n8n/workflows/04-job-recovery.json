@@ -41,6 +41,9 @@
                   },
                   {
                     "option": "Confirm a scene was never submitted"
+                  },
+                  {
+                    "option": "Archive this job"
                   }
                 ]
               }
@@ -82,7 +85,7 @@
         0
       ],
       "parameters": {
-        "jsCode": "const f=$input.first().json; const id=String(f['Job ID']||'').trim();\nif (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Copy a valid Job ID from Job Status.');\nconst action={'Resume safe steps':'resume','Recover an existing scene clip':'recover','Record an existing YouTube video ID':'reconcile-upload','Rebuild narration and captions':'reset-narration','Confirm a scene was never submitted':'confirm-unsubmitted'}[f.Action];\nif(!action) throw new Error('Choose an action.');\nreturn [{json:{id,action,body:{confirmation:String(f['Type NOT_SUBMITTED only after checking Flow']||'').trim(),sceneIndex:Number(f['Scene index (starts at 0)']),filePath:String(f['Recovered clip path (inside imports folder)']||''),youtubeId:String(f['YouTube video ID']||'').trim()}}}];"
+        "jsCode": "const f=$input.first().json; const id=String(f['Job ID']||'').trim();\nif (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Copy a valid Job ID from Job Status.');\nconst action={'Resume safe steps':'resume','Recover an existing scene clip':'recover','Record an existing YouTube video ID':'reconcile-upload','Rebuild narration and captions':'reset-narration','Confirm a scene was never submitted':'confirm-unsubmitted','Archive this job':'archive'}[f.Action];\nif(!action) throw new Error('Choose an action.');\nreturn [{json:{id,action,body:{confirmation:String(f['Type NOT_SUBMITTED only after checking Flow']||'').trim(),sceneIndex:Number(f['Scene index (starts at 0)']),filePath:String(f['Recovered clip path (inside imports folder)']||''),youtubeId:String(f['YouTube video ID']||'').trim()}}}];"
       }
     },
     {

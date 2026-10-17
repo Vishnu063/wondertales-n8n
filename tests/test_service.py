@@ -35,10 +35,11 @@ class ServiceTests(unittest.TestCase):
         code,_=self.request('/v1/jobs',token=False); self.assertEqual(code,401)
         code,result=self.request('/health',token=False); self.assertEqual(code,200)
         self.assertNotIn('token',result)
-    def test_submission_queues_once(self):
+    def test_submission_saves_once_without_bypassing_daily_queue(self):
         a,first=self.request('/v1/jobs',body()); b,second=self.request('/v1/jobs',body())
         self.assertEqual((a,b),(202,200)); self.assertTrue(second['duplicate'])
-        self.assertEqual(first['id'],second['id']); self.service.enqueue.assert_called_once()
+        self.assertEqual(first['id'],second['id']); self.service.enqueue.assert_not_called()
+        self.assertEqual(first['state'],'waiting')
     def test_diagnostics_do_not_reveal_secrets(self):
         code,data=self.request('/v1/setup'); self.assertEqual(code,200)
         self.assertNotIn(self.token,json.dumps(data)); self.assertEqual(data['browserConcurrency'],1)
@@ -86,6 +87,50 @@ class ServiceTests(unittest.TestCase):
         self.assertEqual(code,200)
         self.assertTrue((folder/'clip-00.mp4').exists())
         self.assertFalse((folder/'narration.mp3').exists())
+
+    def test_story_bank_validation_is_all_or_nothing(self):
+        valid=body(); invalid=body(); invalid['durationSeconds']=999
+        status,_=self.request('/v1/stories',{'stories':[valid,invalid]})
+        self.assertEqual(status,400)
+        self.assertEqual(len(self.service.store.list()),0)
+        other=body(); other['title']='Second story'
+        status,data=self.request('/v1/stories',{'stories':[valid,other]})
+        self.assertEqual(status,202)
+        self.assertEqual(len(data['jobs']),2)
+        self.service.enqueue.assert_not_called()
+    def test_pause_and_resume_commands_preserve_story_bank(self):
+        _,job=self.request('/v1/jobs',body())
+        status,data=self.request('/v1/queue/command',{'action':'pause'})
+        self.assertEqual(status,200); self.assertTrue(data['paused'])
+        self.request('/v1/queue/command',{'action':'tick'})
+        self.service.enqueue.assert_not_called()
+        status,data=self.request('/v1/queue/command',{'action':'resume'})
+        self.assertFalse(data['paused'])
+        self.service.enqueue.assert_called_once_with(job['id'])
+    def test_safe_resume_does_not_bypass_queue_or_global_pause(self):
+        _,job=self.request('/v1/jobs',body())
+        self.service.store.update(job['id'],'needs_attention')
+        self.service.store.set_paused(True)
+        status,_=self.request('/v1/jobs/'+job['id']+'/resume',{})
+        self.assertEqual(status,200)
+        self.assertEqual(self.service.store.get(job['id'])['state'],'waiting')
+        self.service.enqueue.assert_not_called()
+    def test_archiving_stopped_job_preserves_scene_records(self):
+        _,job=self.request('/v1/jobs',body())
+        self.service.store.scene(job['id'],0,'done',self.root/'clip.mp4')
+        self.service.store.update(job['id'],'story_too_long')
+        status,_=self.request('/v1/jobs/'+job['id']+'/archive',{})
+        self.assertEqual(status,200)
+        self.assertEqual(self.service.store.get(job['id'])['scenes'][0]['state'],'done')
+
+    def test_pause_hides_ready_jobs_from_automatic_upload(self):
+        _,job=self.request('/v1/jobs',body())
+        self.service.store.update(job['id'],'ready')
+        _,data=self.request('/v1/jobs/'+job['id'])
+        self.assertTrue(data['canClaimUpload'])
+        self.service.store.set_paused(True)
+        _,data=self.request('/v1/jobs/'+job['id'])
+        self.assertFalse(data['canClaimUpload'])
 
 
 if __name__=='__main__': unittest.main()

@@ -50,6 +50,8 @@ def form(name, title, path, fields):
 
 
 def save(name, filename, nodes):
+    for index, item in enumerate(nodes):
+        item['position'] = [index * 240, 0]
     wf = {'name': name, 'nodes': nodes, 'connections': {}, 'active': False,
           'settings': {'executionOrder': 'v1'}, 'tags': []}
     for left, right in zip(nodes, nodes[1:]):
@@ -120,16 +122,16 @@ save('WonderTales — Preflight (no video credits)', '02-preflight.json', check_
 
 status_form = form('Status Form', 'WonderTales jobs and setup', 'wondertales-status', [field('Job ID (blank lists recent jobs)')])
 status_http = http('Get Job Status', "={{ '"+BASE+"/v1/jobs' + ($json['Job ID (blank lists recent jobs)'] ? '/' + encodeURIComponent($json['Job ID (blank lists recent jobs)'].trim()) : '') }}", 240)
-status = code('Readable Status', "const data=$input.first().json; return (data.jobs || [data]).map(j=>({json:{jobId:j.id,title:j.body.title,state:j.state,progress:j.progress,detail:j.detail,flowAccount:j.body.flowAccount,destination:j.body.youtubeDestination,quality:j.report,privateYouTubeLink:j.youtubeUrl,scenes:j.scenes}}));", 480)
+status = code('Readable Status', "const data=$input.first().json; return (data.jobs || [data]).map(j=>({json:{jobId:j.id,title:j.body.title,state:j.state,progress:j.progress,detail:j.detail,flowAccount:j.body.flowAccount,destination:j.body.youtubeDestination,quality:j.report,nextAction:j.nextAction,privateYouTubeLink:j.youtubeUrl,scenes:j.scenes}}));", 480)
 save('WonderTales — Job Status', '03-job-status.json', [status_form,status_http,status])
 
 manage_form = form('Manage Job Form', 'Recover or resume WonderTales jobs', 'wondertales-manage', [
-    field('Job ID', required=True), field('Action', ['Resume safe steps', 'Recover an existing scene clip', 'Record an existing YouTube video ID', 'Rebuild narration and captions', 'Confirm a scene was never submitted'], True),
+    field('Job ID', required=True), field('Action', ['Resume safe steps', 'Recover an existing scene clip', 'Record an existing YouTube video ID', 'Rebuild narration and captions', 'Confirm a scene was never submitted', 'Archive this job'], True),
     field('Scene index (starts at 0)'), field('Type NOT_SUBMITTED only after checking Flow'), field('Recovered clip path (inside imports folder)'), field('YouTube video ID')])
 manage_code = code('Prepare Recovery Action', r'''
 const f=$input.first().json; const id=String(f['Job ID']||'').trim();
 if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Copy a valid Job ID from Job Status.');
-const action={'Resume safe steps':'resume','Recover an existing scene clip':'recover','Record an existing YouTube video ID':'reconcile-upload','Rebuild narration and captions':'reset-narration','Confirm a scene was never submitted':'confirm-unsubmitted'}[f.Action];
+const action={'Resume safe steps':'resume','Recover an existing scene clip':'recover','Record an existing YouTube video ID':'reconcile-upload','Rebuild narration and captions':'reset-narration','Confirm a scene was never submitted':'confirm-unsubmitted','Archive this job':'archive'}[f.Action];
 if(!action) throw new Error('Choose an action.');
 return [{json:{id,action,body:{confirmation:String(f['Type NOT_SUBMITTED only after checking Flow']||'').trim(),sceneIndex:Number(f['Scene index (starts at 0)']),filePath:String(f['Recovered clip path (inside imports folder)']||''),youtubeId:String(f['YouTube video ID']||'').trim()}}}];
 '''.strip(), 240)
@@ -139,9 +141,9 @@ save('WonderTales — Job Recovery', '04-job-recovery.json', [manage_form,manage
 schedule=node('Check Ready Jobs', 'scheduleTrigger', {'rule':{'interval':[{'field':'minutes','minutesInterval':1}]}},0,1.2)
 dest=fields_node('YouTube Destination (configure)', {'destination':'channel-main','expectedChannelId':''},240)
 channel=http('Verify Connected YouTube Account', 'https://www.googleapis.com/youtube/v3/channels?part=id&mine=true',480,google=True)
-verify=code('Guard Channel Identity', "const c=$('YouTube Destination (configure)').first().json; if(!c.expectedChannelId || !$input.first().json.items?.some(x=>x.id===c.expectedChannelId)) throw new Error('Set the expected YouTube channel ID and connect the matching OAuth credential on BOTH Google nodes.'); return [{json:c}];",720)
+verify=code('Guard Channel Identity', "const c=$('YouTube Destination (configure)').first().json; if(!c.expectedChannelId || !$input.first().json.items?.some(x=>x.id===c.expectedChannelId)) throw new Error('Set the expected YouTube channel ID and connect the matching OAuth credential on BOTH Google nodes.'); return [{json:$('Pick One Job for This Channel').first().json}];",720)
 list_jobs=http('List Ready Jobs', BASE+'/v1/jobs',960)
-select=code('Pick One Job for This Channel', "const destination=$('YouTube Destination (configure)').first().json.destination; const j=$input.first().json.jobs.find(j=>j.state==='ready' && j.body.youtubeDestination===destination); return j ? [{json:j}] : [];",1200)
+select=code('Pick One Job for This Channel', "const destination=$('YouTube Destination (configure)').first().json.destination; const j=$input.first().json.jobs.find(j=>j.state==='ready' && j.canClaimUpload===true && j.body.youtubeDestination===destination); return j ? [{json:j}] : [];",1200)
 claim=http('Claim Upload', "={{ '"+BASE+"/v1/jobs/' + $json.id + '/claim-upload' }}",1440,'POST',"={{ {destination: $json.body.youtubeDestination} }}")
 download=http('Download Verified Video', "={{ '"+BASE+"/v1/jobs/' + $json.id + '/video' }}",1680,download=True)
 upload=node('Upload Private to YouTube', 'youTube', {'resource':'video','operation':'upload',
@@ -151,7 +153,7 @@ upload=node('Upload Private to YouTube', 'youTube', {'resource':'video','operati
                'description':'Children’s story created with AI-assisted animation. Uploaded privately for creator review.'}},1920,1,retryOnFail=False)
 complete=code('Validate Upload Result', "const id=$input.first().json.uploadId || $input.first().json.id; if(!/^[A-Za-z0-9_-]{11}$/.test(String(id||''))) throw new Error('Upload result is uncertain. Check YouTube and record its video ID in Job Recovery. Do not retry this upload.'); const j=$('Claim Upload').first().json; return [{json:{jobId:j.id,youtubeId:id,uploadClaim:j.uploadClaim}}];",2160)
 record=http('Record Private Upload', "={{ '"+BASE+"/v1/jobs/' + $json.jobId + '/complete-upload' }}",2400,'POST',"={{ {youtubeId:$json.youtubeId, uploadClaim:$json.uploadClaim} }}")
-save('WonderTales — Private Upload (one destination)', '05-private-youtube-upload.json', [schedule,dest,channel,verify,list_jobs,select,claim,download,upload,complete,record])
+save('WonderTales — Private Upload (one destination)', '05-private-youtube-upload.json', [schedule,dest,list_jobs,select,channel,verify,claim,download,upload,complete,record])
 setup=node('Check Setup', 'manualTrigger', {},0)
 save('WonderTales — Setup Diagnostics', '06-setup-diagnostics.json',[setup,http('Check Local Tools and Account Aliases',BASE+'/v1/setup',240)])
 
@@ -161,3 +163,44 @@ account_form = form('Account Aliases Form', 'Register dedicated account aliases'
 account_code = code('Prepare Account Mapping', "const f=$input.first().json; return [{json:{flowAlias:String(f['Flow alias (optional)']||'').trim(),profile:String(f['Dedicated Chrome profile name']||'').trim(),project:String(f['Existing Flow project ID (optional)']||'').trim(),destination:String(f['YouTube destination alias (optional)']||'').trim()}}];",240)
 account_http = http('Save Private Account Mapping',BASE+'/v1/setup/accounts',480,'POST','={{ $json }}')
 save('WonderTales — Manage Account Aliases', '07-account-aliases.json',[account_form,account_code,account_http])
+
+# Batch intake reuses the same validation/casting logic as single-story intake.
+bank_nodes = json.loads(json.dumps([story_form,registry_node,config,prepare,queue]))
+bank_form = bank_nodes[0]
+bank_form['parameters']['path'] = 'wondertales-story-bank'
+bank_form['parameters']['formTitle'] = 'WonderTales story bank — submit several stories'
+bank_form['webhookId'] = str(uuid.uuid5(uuid.NAMESPACE_URL,'wondertales-story-bank'))
+bank_fields = bank_form['parameters']['formFields']['values']
+bank_fields[:] = [f for f in bank_fields if f['fieldLabel'] not in ('Story title','Story / poem / rhyme')]
+bank_fields.insert(0,field('Story bank (title on first line; separate stories with ---)',required=True,kind='textarea'))
+source = prepare['parameters']['jsCode']
+source = source.replace("const form = $('Story Submission Form').first().json;", '')
+bank_nodes[3]['parameters']['jsCode'] = r'''
+const input = $('Story Submission Form').first().json;
+const raw = String(input['Story bank (title on first line; separate stories with ---)'] || '').trim();
+const blocks = raw.split(/\r?\n\s*---\s*\r?\n/).map(s=>s.trim()).filter(Boolean);
+if (!blocks.length || blocks.length>30) throw new Error('Submit between 1 and 30 stories. Separate blocks with a line containing ---');
+const stories = blocks.map(block=>{
+ const lines=block.split(/\r?\n/); const bankTitle=lines.shift().trim(); const bankStory=lines.join('\n').trim();
+ if(!bankTitle || !bankStory) throw new Error('Every block needs a title on its first line, then story text below it.');
+ const form={...input,'Story title':bankTitle,'Story / poem / rhyme':bankStory};
+''' + source + '\n}).map(result=>result[0].json); return [{json:{stories}}];'
+bank_nodes[-1]['name'] = 'Save Story Bank'
+bank_nodes[-1]['parameters']['url'] = BASE+'/v1/stories'
+save('WonderTales — Story Bank', '08-story-bank.json', bank_nodes)
+
+queue_schedule=node('Daily Queue Tick', 'scheduleTrigger', {'rule':{'interval':[{'field':'minutes','minutesInterval':5}]}},0,1.2)
+queue_tick=http('Check Daily Queue',BASE+'/v1/queue/tick',240,'POST','={{ {} }}')
+queue_summary=http('Show Queue Result',BASE+'/v1/queue/summary',480)
+save('WonderTales — Rule-Based Daily Queue', '09-daily-queue-manager.json',[queue_schedule,queue_tick,queue_summary])
+control_form=form('Queue Controls Form','WonderTales queue controls','wondertales-queue-controls',[
+ field('Action',['Pause everything','Resume everything','Check queue now','Show daily summary'],True)])
+control_code=code('Prepare Queue Command',"const action={'Pause everything':'pause','Resume everything':'resume','Check queue now':'tick','Show daily summary':'summary'}[$input.first().json.Action]; if(!action) throw new Error('Choose a queue action.'); return [{json:{action}}];",240)
+control_http=http('Apply Queue Command',BASE+'/v1/queue/command',480,'POST','={{ $json }}')
+save('WonderTales — Pause Resume and Summary', '10-queue-controls.json',[control_form,control_code,control_http])
+summary_schedule=node('Daily Summary at 8 PM', 'scheduleTrigger', {'rule':{'interval':[{'field':'cronExpression','expression':'0 20 * * *'}]}},0,1.2)
+save('WonderTales — Daily Summary (in n8n)', '11-daily-summary.json',[summary_schedule,http('Daily Summary',BASE+'/v1/queue/summary',240)])
+for filename in ('09-daily-queue-manager.json','11-daily-summary.json'):
+ path=ROOT/filename
+ data=json.loads(path.read_text()); data['settings']['timezone']='Asia/Kolkata'
+ path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')

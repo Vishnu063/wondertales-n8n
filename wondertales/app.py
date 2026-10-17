@@ -12,9 +12,11 @@ import re
 import secrets
 import shutil
 import threading
+import time
 from urllib.parse import urlsplit
 
 from .core import Pipeline, StopJob, Store, allowed_file, probe, validate
+from .queue import QueueManager
 
 
 def load_settings(root):
@@ -50,6 +52,7 @@ class Service:
         self.executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix='wondertales')
         self.mutations = threading.Lock()
         self.browser = threading.Lock()
+        self.manager = QueueManager(self)
 
     def configure_accounts(self, body):
         if not self.browser.acquire(blocking=False):
@@ -97,8 +100,10 @@ class Service:
                 if blockers:
                     raise StopJob('blocked_browser', 'Resolve the earlier Flow login or uncertain scene first. Close any leftover spare Chrome window before resuming jobs.')
                 self.pipeline.execute(ident)
+                if self.store.get(ident)['state'] == 'ready':
+                    self.store.reserve_day(self.manager.day(), ident)
             except StopJob as exc:
-                self.store.update(ident, exc.state, exc.detail)
+                self.store.update(ident, exc.state, exc.detail, retry_after=time.time()+3600 if exc.state == 'blocked_credit' else 0)
             except Exception:
                 # A provider may have accepted a scene before failing locally.
                 job = self.store.get(ident)
@@ -114,7 +119,12 @@ class Service:
         job = self.store.get(ident)
         job.pop('fingerprint', None)
         job.pop('claim', None)
+        with self.store.connect() as db:
+            slot = db.execute('SELECT job FROM daily_dispatches WHERE day=?',(self.manager.day(),)).fetchone()
+        job['canClaimUpload'] = job['state']=='ready' and not self.store.is_paused() and (slot is None or slot[0]==ident)
         job['videoUrl'] = f'/v1/jobs/{ident}/video' if job['state'] in ('ready', 'uploading', 'uploaded', 'upload_uncertain') else None
+        from .queue import HUMAN
+        job['nextAction'] = HUMAN.get(job['state'], 'Wait for the next balance check.' if job['state']=='blocked_credit' else 'Use Resume Everything in Queue Controls.' if job['state']=='paused' else 'No action needed.')
         job['youtubeUrl'] = f"https://www.youtube.com/watch?v={job['youtube_id']}" if job.get('youtube_id') else None
         return job
 
@@ -122,12 +132,16 @@ class Service:
         with self.mutations:
             job = self.store.get(ident)
             if action == 'resume':
-                if job['state'] not in ('needs_setup', 'blocked_login', 'blocked_credit', 'blocked_browser', 'needs_references', 'needs_attention'):
+                if job['state'] not in ('needs_setup', 'blocked_login', 'blocked_balance', 'blocked_credit', 'blocked_browser', 'needs_references', 'needs_attention'):
                     raise ValueError('This job cannot safely resume. Reconcile uncertain generations/uploads first.')
                 if any(s['state'] in ('uncertain', 'generating') for s in job['scenes']):
                     raise ValueError('Recover the uncertain clip before resuming')
-                self.store.update(ident, 'queued', 'Resuming safe remaining steps.')
-                self.enqueue(ident)
+                self.store.update(ident, 'waiting', 'Safe resume requested; the daily queue and global pause still apply.', retry_after=0)
+            elif action == 'archive':
+                from .queue import ACTIVE
+                if job['state'] in ACTIVE or job['state'] in ('uploading','upload_uncertain'):
+                    raise ValueError('Wait for active work or reconcile the uncertain upload before archiving')
+                self.store.update(ident, 'cancelled', 'Archived by owner. Saved clips are preserved; no further generation will run.')
             elif action == 'reset-narration':
                 if job['state'] not in ('needs_attention', 'story_too_long'):
                     raise ValueError('Narration can only be rebuilt on a stopped job')
@@ -211,6 +225,31 @@ def make_handler(service, token):
                     'flowAccounts': list(service.settings['accounts']),
                     'youtubeDestinations': service.settings['youtubeDestinations'],
                     'browserConcurrency': 1, 'generationModel': 'veo-lite'})
+            if path == '/v1/queue/command' and method == 'POST':
+                action = body.get('action')
+                if action not in ('pause','resume','tick','summary'):
+                    raise ValueError('Choose a supported queue command')
+                if action in ('pause','resume'):
+                    service.store.set_paused(action == 'pause')
+                result = service.manager.tick() if action in ('resume','tick') else None
+                return self.send_json(200, {**service.manager.summary(), 'queueCheck':result})
+            if path == '/v1/queue/tick' and method == 'POST':
+                return self.send_json(200, service.manager.tick())
+            if path == '/v1/queue/summary' and method == 'GET':
+                return self.send_json(200, service.manager.summary())
+            if path == '/v1/queue/control' and method == 'POST':
+                if type(body.get('paused')) is not bool:
+                    raise ValueError('Choose Pause Everything or Resume Everything')
+                service.store.set_paused(body['paused'])
+                return self.send_json(200, service.manager.summary())
+            if path == '/v1/stories' and method == 'POST':
+                stories = body.get('stories')
+                if not isinstance(stories,list) or not 1 <= len(stories) <= 30:
+                    raise ValueError('Submit between one and thirty stories in a batch')
+                with service.mutations:
+                    validated = [validate(story,service.settings) for story in stories]
+                    saved = service.store.submit_many(validated)
+                return self.send_json(202, {'jobs':[{**service.public(j['id']), 'duplicate':not created} for j,created in saved]})
             if path == '/v1/setup/accounts' and method == 'POST':
                 return self.send_json(200, service.configure_accounts(body))
             if path == '/v1/jobs':
@@ -219,8 +258,6 @@ def make_handler(service, token):
                 with service.mutations:
                     data = validate(body, service.settings)
                     job, created = service.store.submit(data)
-                    if created:
-                        service.enqueue(job['id'])
                 return self.send_json(202 if created else 200, {**service.public(job['id']), 'duplicate': not created})
             if method == 'POST' and path == '/v1/preflight':
                 data = validate(body, service.settings)
@@ -302,8 +339,7 @@ def main():
     except BlockingIOError:
         raise SystemExit('Another WonderTales worker already owns this browser runner.')
     service = Service(root, settings)
-    for ident in service.store.recover_after_restart():
-        service.enqueue(ident)
+    service.store.recover_after_restart()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(service, token))
     print(f'WonderTales is listening on http://127.0.0.1:{args.port}; use n8n for submissions and status.')
     try:

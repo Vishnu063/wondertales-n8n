@@ -52,45 +52,12 @@
       }
     },
     {
-      "id": "f96cc53a-23dd-58e5-962d-a408a3363ad1",
-      "name": "Verify Connected YouTube Account",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        480,
-        0
-      ],
-      "parameters": {
-        "url": "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
-        "method": "GET",
-        "authentication": "predefinedCredentialType",
-        "options": {
-          "timeout": 30000
-        },
-        "nodeCredentialType": "youTubeOAuth2Api"
-      },
-      "retryOnFail": false
-    },
-    {
-      "id": "390105e2-c647-5aff-b68b-0555ea0232b4",
-      "name": "Guard Channel Identity",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        720,
-        0
-      ],
-      "parameters": {
-        "jsCode": "const c=$('YouTube Destination (configure)').first().json; if(!c.expectedChannelId || !$input.first().json.items?.some(x=>x.id===c.expectedChannelId)) throw new Error('Set the expected YouTube channel ID and connect the matching OAuth credential on BOTH Google nodes.'); return [{json:c}];"
-      }
-    },
-    {
       "id": "ab3ada07-205c-51ec-b230-0d7676794f72",
       "name": "List Ready Jobs",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        960,
+        480,
         0
       ],
       "parameters": {
@@ -110,11 +77,44 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const destination=$('YouTube Destination (configure)').first().json.destination; const j=$input.first().json.jobs.find(j=>j.state==='ready' && j.canClaimUpload===true && j.body.youtubeDestination===destination); return j ? [{json:j}] : [];"
+      }
+    },
+    {
+      "id": "f96cc53a-23dd-58e5-962d-a408a3363ad1",
+      "name": "Verify Connected YouTube Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
+        "method": "GET",
+        "authentication": "predefinedCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "nodeCredentialType": "youTubeOAuth2Api"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "390105e2-c647-5aff-b68b-0555ea0232b4",
+      "name": "Guard Channel Identity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
         1200,
         0
       ],
       "parameters": {
-        "jsCode": "const destination=$('YouTube Destination (configure)').first().json.destination; const j=$input.first().json.jobs.find(j=>j.state==='ready' && j.body.youtubeDestination===destination); return j ? [{json:j}] : [];"
+        "jsCode": "const c=$('YouTube Destination (configure)').first().json; if(!c.expectedChannelId || !$input.first().json.items?.some(x=>x.id===c.expectedChannelId)) throw new Error('Set the expected YouTube channel ID and connect the matching OAuth credential on BOTH Google nodes.'); return [{json:$('Pick One Job for This Channel').first().json}];"
       }
     },
     {
@@ -247,28 +247,6 @@
       "main": [
         [
           {
-            "node": "Verify Connected YouTube Account",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Verify Connected YouTube Account": {
-      "main": [
-        [
-          {
-            "node": "Guard Channel Identity",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Guard Channel Identity": {
-      "main": [
-        [
-          {
             "node": "List Ready Jobs",
             "type": "main",
             "index": 0
@@ -288,6 +266,28 @@
       ]
     },
     "Pick One Job for This Channel": {
+      "main": [
+        [
+          {
+            "node": "Verify Connected YouTube Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Connected YouTube Account": {
+      "main": [
+        [
+          {
+            "node": "Guard Channel Identity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard Channel Identity": {
       "main": [
         [
           {
