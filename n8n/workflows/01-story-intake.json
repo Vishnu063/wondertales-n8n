@@ -1,0 +1,245 @@
+{
+  "name": "WonderTales — Story Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "wondertales-story",
+        "formTitle": "Create a WonderTales video",
+        "formDescription": "Paste your story, poem, or nursery rhyme. The video will be uploaded to YouTube as Private for your review.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Story title",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Story / poem / rhyme",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Language",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "English"
+                  },
+                  {
+                    "option": "Hindi"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Video format",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "9:16 vertical"
+                  },
+                  {
+                    "option": "16:9 landscape"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Target duration",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "30 seconds"
+                  },
+                  {
+                    "option": "1 minute"
+                  },
+                  {
+                    "option": "90 seconds"
+                  },
+                  {
+                    "option": "2 minutes"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -620,
+        80
+      ],
+      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a01",
+      "name": "Story Submission Form",
+      "webhookId": "wondertales-story-intake"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "character-01",
+              "name": "character_01",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-02",
+              "name": "character_02",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-03",
+              "name": "character_03",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-04",
+              "name": "character_04",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-05",
+              "name": "character_05",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-06",
+              "name": "character_06",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-07",
+              "name": "character_07",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-08",
+              "name": "character_08",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-09",
+              "name": "character_09",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character-10",
+              "name": "character_10",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -360,
+        80
+      ],
+      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a02",
+      "name": "Character Registry (edit in n8n)"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const form = $('Story Submission Form').first().json;\nconst registry = $('Character Registry (edit in n8n)').first().json;\nconst characterPool = Object.entries(registry)\n  .filter(([key, value]) => /^character_\\\\d{2}$/.test(key) && typeof value === 'string' && value.trim())\n  .map(([, value]) => value.trim());\n\nif (characterPool.length < 2) {\n  throw new Error('Add at least two character names in the Character Registry node before submitting a story.');\n}\n\nconst language = String(form['Language'] || '').trim();\nconst formatChoice = String(form['Video format'] || '').trim();\nconst durationChoice = String(form['Target duration'] || '').trim();\nconst title = String(form['Story title'] || '').trim();\nconst story = String(form['Story / poem / rhyme'] || '').trim();\n\nif (!title || !story) throw new Error('Story title and story text are required.');\nif (!['English', 'Hindi'].includes(language)) throw new Error('Choose English or Hindi.');\nif (!['9:16 vertical', '16:9 landscape'].includes(formatChoice)) throw new Error('Choose a supported video format.');\n\nconst durationSeconds = {\n  '30 seconds': 30,\n  '1 minute': 60,\n  '90 seconds': 90,\n  '2 minutes': 120\n}[durationChoice];\nif (!durationSeconds) throw new Error('Choose a supported duration.');\n\nconst shuffled = [...characterPool];\nfor (let i = shuffled.length - 1; i > 0; i--) {\n  const j = Math.floor(Math.random() * (i + 1));\n  [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];\n}\nconst desiredCount = Math.random() < 0.5 ? 2 : 3;\nconst selectedCharacters = shuffled.slice(0, Math.min(desiredCount, shuffled.length));\n\nreturn {\n  json: {\n    requestId: String($execution.id),\n    title,\n    story,\n    language,\n    aspectRatio: formatChoice.startsWith('9:16') ? '9:16' : '16:9',\n    durationSeconds,\n    selectedCharacters,\n    uploadVisibility: 'private'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        80
+      ],
+      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a03",
+      "name": "Validate and Choose Characters"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8099/v1/jobs",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        80
+      ],
+      "id": "8f21c377-12f3-49f1-9d07-4e3c20d51a04",
+      "name": "Queue Local Video Job"
+    }
+  ],
+  "connections": {
+    "Story Submission Form": {
+      "main": [
+        [
+          {
+            "node": "Character Registry (edit in n8n)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Registry (edit in n8n)": {
+      "main": [
+        [
+          {
+            "node": "Validate and Choose Characters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Choose Characters": {
+      "main": [
+        [
+          {
+            "node": "Queue Local Video Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4d889225-a37d-4d4d-921f-81a8ef6dd933",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
