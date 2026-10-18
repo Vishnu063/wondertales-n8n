@@ -1,0 +1,163 @@
+{
+  "name": "WonderTales — VoiceStudio Settings",
+  "nodes": [
+    {
+      "id": "c91e6052-0064-5fc8-9534-8209942b4e8d",
+      "name": "VoiceStudio Settings Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "wondertales-voice-settings",
+        "formTitle": "Register a local VoiceStudio narrator",
+        "formDescription": "Use n8n execution results to see status and errors. All uploads remain Private.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Voice alias (english-main or hindi-main)",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Language",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "English"
+                  },
+                  {
+                    "option": "Hindi"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Engine",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "kittentts"
+                  },
+                  {
+                    "option": "omnivoice-gguf"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Voice ID (preset or existing profile ID)",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Speed (blank uses 1)",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Local port (blank uses 3900)",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Pinned local ASR",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "faster-whisper"
+                  },
+                  {
+                    "option": "whisperx"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Voice use / licence notes (optional)",
+              "fieldType": "textarea",
+              "requiredField": false
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "f6024d90-791b-5f49-93a5-e7f4833f1f54"
+    },
+    {
+      "id": "6e730445-a0a0-5bfd-80f0-bec2fea382f8",
+      "name": "Prepare VoiceStudio Mapping",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const f=$input.first().json;\nreturn [{json:{alias:String(f['Voice alias (english-main or hindi-main)'] || '').trim(),language:f.Language,engine:f.Engine,\n voice:String(f['Voice ID (preset or existing profile ID)'] || '').trim(),speed:Number(f['Speed (blank uses 1)'] || 1),\n port:Number(f['Local port (blank uses 3900)'] || 3900),asrEngine:f['Pinned local ASR'],note:String(f['Voice use / licence notes (optional)'] || '').trim()}}];"
+      }
+    },
+    {
+      "id": "80d5fc23-7da4-52dc-b19f-94c09fd93e11",
+      "name": "Save Private Voice Alias",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/setup/voicestudio",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "VoiceStudio Settings Form": {
+      "main": [
+        [
+          {
+            "node": "Prepare VoiceStudio Mapping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare VoiceStudio Mapping": {
+      "main": [
+        [
+          {
+            "node": "Save Private Voice Alias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

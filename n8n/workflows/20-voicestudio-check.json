@@ -1,0 +1,54 @@
+{
+  "name": "WonderTales — VoiceStudio Connection Check",
+  "nodes": [
+    {
+      "id": "8a5b2b6a-4cd1-5884-9f7f-b94b6adaaab9",
+      "name": "Check VoiceStudio Inventory",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "7ff430e7-68b8-5187-beeb-6e6ec68fd745",
+      "name": "List Local Voices and Engines",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/setup/voicestudio",
+        "method": "GET",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 120000
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Check VoiceStudio Inventory": {
+      "main": [
+        [
+          {
+            "node": "List Local Voices and Engines",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

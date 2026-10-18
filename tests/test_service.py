@@ -149,5 +149,18 @@ class ServiceTests(unittest.TestCase):
         status, result = self.request('/v1/growth/report')
         self.assertEqual(result['channels'][0]['subscriberCount'], 42)
 
+    def test_voice_profile_mapping_is_private_and_pins_existing_job(self):
+        mapping={'alias':'english-main','language':'English','engine':'kittentts','voice':'expr-voice-2-f',
+                 'speed':1,'port':3900,'asrEngine':'faster-whisper'}
+        self.assertEqual(self.request('/v1/setup/voicestudio',mapping,token=False)[0],401)
+        self.assertEqual(self.request('/v1/voicestudio/sample',{},token=False)[0],401)
+        status,_=self.request('/v1/setup/voicestudio',mapping); self.assertEqual(status,200)
+        b=body(); b['ttsProvider']='voicestudio'
+        status,job=self.request('/v1/jobs',b); self.assertEqual(status,202)
+        mapping['voice']='expr-voice-3-f'; self.request('/v1/setup/voicestudio',mapping)
+        old=self.service.store.get(job['id'])['body']['voiceStudioConfig']
+        self.assertEqual(old['voice'],'expr-voice-2-f')
+        self.assertNotIn('token',old)
+
 
 if __name__=='__main__': unittest.main()

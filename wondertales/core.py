@@ -27,7 +27,7 @@ def validate(body, settings):
     keys = {"title", "story", "language", "aspectRatio", "flowAccount", "youtubeDestination",
             "durationSeconds", "selectedCharacters", "consistencyMode", "creditCostPerClip", "maxCreditsPerJob", "variant",
             "editor", "subtitleStyle", "musicFile", "musicVolume", "learningGoal", "rightsNote",
-            "storyboard", "visualStyle", "characterLibraryVersion", "audioFile", "captionFile"}
+            "storyboard", "visualStyle", "characterLibraryVersion", "audioFile", "captionFile", "ttsProvider", "voiceAlias"}
     b = copy.deepcopy({k: v for k, v in body.items() if k in keys})
     b.setdefault('editor', 'builtin')
     b.setdefault('subtitleStyle', 'clean')
@@ -84,6 +84,22 @@ def validate(body, settings):
         raise ValueError('Supply both your audio file and matching SRT captions, or leave both blank')
     from .studio import validate_plan
     validate_plan(b)
+    provider = b.get('ttsProvider', 'edge')
+    if provider not in ('edge', 'owner', 'voicestudio'):
+        raise ValueError('Choose Edge speech, owner audio, or VoiceStudio')
+    if b.get('audioFile'):
+        if provider == 'voicestudio':
+            raise ValueError('Choose either VoiceStudio generation or your own audio files')
+        provider = 'owner'
+    if provider == 'owner' and not b.get('audioFile'):
+        raise ValueError('Owner audio requires both an audio file and SRT captions')
+    b['ttsProvider'] = provider
+    if provider == 'voicestudio':
+        from .voicestudio import profile
+        b['voiceStudioConfig'] = profile(b, settings)
+        b['voiceAlias'] = b['voiceStudioConfig']['alias']
+        if not b.get('storyboard') and len(b['story']) > 4096:
+            raise ValueError('Use a storyboard for VoiceStudio narration longer than 4096 characters')
     b['estimatedCredits'] = b['plannedSceneCount'] * b['creditCostPerClip']
     if b['estimatedCredits'] > b['maxCreditsPerJob']:
         raise ValueError('Estimated credits exceed the per-job cap. Change duration or the cap in n8n.')
@@ -306,6 +322,9 @@ class Pipeline:
             preflight(body, self.settings, self.state_dir)
             from .audio import owner_assets
             owner_assets(body, self.settings)
+            if body.get('ttsProvider') == 'voicestudio':
+                from .voicestudio import Client
+                Client(body['voiceStudioConfig'], self.state_dir).preflight()
         account = {'profile': body.get('flowProfile') or self.settings['accounts'][body['flowAccount']]['profile'],
                    'project': body.get('flowProject', '')}
         if not isinstance(account.get('profile'), str) or not re.fullmatch(r'[A-Za-z0-9_-]+', account['profile']):
@@ -352,7 +371,11 @@ class Pipeline:
         required = ['ffmpeg', 'ffprobe']
         if pending:
             required.append('gflow')
-        if not body.get('audioFile') and (not (work/'narration.mp3').exists() or not (work/'captions.srt').exists()):
+        missing_audio = not (work/'narration.mp3').exists() or not (work/'captions.srt').exists()
+        if body.get('ttsProvider') == 'voicestudio' and missing_audio:
+            from .voicestudio import Client
+            Client(body['voiceStudioConfig'], self.state_dir).preflight()
+        if body.get('ttsProvider', 'edge') == 'edge' and not body.get('audioFile') and missing_audio:
             required.append('edge-tts')
         for binary in required:
             if not shutil.which(binary):
@@ -475,6 +498,8 @@ class Pipeline:
         report.update(captions='timed and burned in', consistency=body.get('consistencyMode', 'reference'),
                       narration='owner-supplied audio' if body.get('audioFile') else 'aligned scene speech' if body.get('storyboard') else 'spoken, not sung', finalFile='final.mp4',
                       characterLibraryVersion=body.get('characterLibraryVersion', ''), storyboard=bool(body.get('storyboard')),
+                      audioProvider=body.get('ttsProvider', 'edge'), voiceAlias=body.get('voiceAlias', ''),
+                      captionSource='VoiceStudio local ASR; review against the script' if body.get('ttsProvider') == 'voicestudio' else 'owner SRT' if body.get('audioFile') else 'speech service timing',
                       editor=body.get('editor', 'builtin'), storyReview=check,
                       music='owner-supplied local file' if body.get('musicFile') else 'none')
         report['titleSuggestions'] = [body['title']]

@@ -71,3 +71,11 @@ assert.throws(()=>new Function('$','$input',retentionQuery)(()=>({first:()=>({js
 const bankWithPlan={...bankForm,'Scene plan (optional)':scriptedForm['Scene plan (optional)']};
 assert.throws(()=>new Function('$','$input',bank.nodes.find(n=>n.name==='Validate and Choose Characters').parameters.jsCode)(name=>({first:()=>({json:name==='Story Submission Form'?bankWithPlan:registry})}),input));
 console.log('18 workflows: storyboard casting, central library, replacement form and public-only retention query: passed');
+const vsForm={...form,'Audio provider':'VoiceStudio local','VoiceStudio voice alias (optional; uses language default)':'hindi-main'};
+const vsBody=fn(name=>({first:()=>({json:name==='Story Submission Form'?vsForm:registry})}),input)[0].json;
+assert.strictEqual(vsBody.ttsProvider,'voicestudio');assert.strictEqual(vsBody.voiceAlias,'hindi-main');
+const sampleFlow=wf('21-voicestudio-sample.json');
+assert(!sampleFlow.nodes.some(n=>n.type==='n8n-nodes-base.youTube'));
+assert.strictEqual(sampleFlow.nodes.find(n=>n.name==='Generate Local Audio Sample').retryOnFail,false);
+assert(sampleFlow.nodes.find(n=>n.name==='Download Sample Audio').parameters.options.response);
+console.log('21 workflows: VoiceStudio provider/alias mapping and sample without video/upload nodes: passed');

@@ -69,6 +69,14 @@ def prepare(body, settings, work, command):
         shutil.copyfile(srt,captions)
         return
     plan=body.get('storyboard')
+    client=None
+    if body.get('ttsProvider')=='voicestudio':
+        from .voicestudio import Client
+        client=Client(body['voiceStudioConfig'],work.parents[1])
+        if not plan:
+            spoken,timed=client.unit(body['story'],work/'vs-narration',command,max_duration=body['durationSeconds']-0.2)
+            shutil.copyfile(spoken,audio); shutil.copyfile(timed,captions)
+            return
     if not plan: return False
     voice=settings.get('voices',{}).get(body['language'],'hi-IN-SwaraNeural' if body['language']=='Hindi' else 'en-IN-NeerjaNeural')
     cues=[]
@@ -76,7 +84,13 @@ def prepare(body, settings, work, command):
         slot=min(8,body['durationSeconds']-n*8)
         spoken,timed=work/f'scene-voice-{n:02}.mp3',work/f'scene-captions-{n:02}.srt'
         if not spoken.is_file() or not timed.is_file():
-            result=command(['edge-tts','--voice',voice,'--text',scene['narration'],'--write-media',spoken,'--write-subtitles',timed])
+            if client:
+                generated,srt=client.unit(scene['narration'],work/f'vs-scene-{n:02}',command,max_duration=slot-0.1)
+                shutil.copyfile(generated,spoken); shutil.copyfile(srt,timed)
+                from subprocess import CompletedProcess
+                result=CompletedProcess([],0)
+            else:
+                result=command(['edge-tts','--voice',voice,'--text',scene['narration'],'--write-media',spoken,'--write-subtitles',timed])
             if result.returncode or not spoken.is_file() or not timed.is_file():
                 raise StopJob('needs_attention',f'Scene {n+1} narration failed before new Flow spending. Safe Resume reuses the completed speech files.')
         duration=float(probe(spoken)['format']['duration'])

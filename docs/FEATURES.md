@@ -61,3 +61,9 @@ See [setup, limitations and first live run](EDITOR_AND_GROWTH.md). Offline fixtu
 - Public-video retention analysis, one video per run, account guards, rolling-window snapshots and labelled intervals to inspect; no automatic creative changes.
 
 Workflows 16–18 are inactive until configured. See the [storyboard/revision guide](STORYBOARD_AND_REVISIONS.md) for operation and live-test limitations.
+
+## Optional VoiceStudio speech service
+
+Workflows 19–21 configure a local narrator mapping, inspect available engines/profiles and generate an audio-only sample. Explicit English KittenTTS or multilingual OmniVoice GGUF settings are pinned per job, with environment-pinned local ASR for captions. Audio is cached before transcription, so caption recovery reuses existing speech. Overlong/invalid output stops before new Flow spending; no cloud/paid fallback is added.
+
+The optional source installer/launcher keeps VoiceStudio separate from the main worker. Real model/binary performance and speech quality are not live-tested here. See the [VoiceStudio guide](VOICESTUDIO.md).

@@ -97,6 +97,31 @@ class Service:
     def enqueue(self, ident):
         self.executor.submit(self.work, ident)
 
+    def configure_voice(self, body):
+        from .voicestudio import profile
+        with self.mutations:
+            alias=body.get('alias'); language=body.get('language')
+            if not isinstance(alias,str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}',alias) or language not in ('Hindi','English'):
+                raise ValueError('Enter a simple voice alias and choose Hindi or English')
+            port=body.get('port',3900)
+            if type(port) is not int or not 1024<=port<=65535:
+                raise ValueError('VoiceStudio port must be between 1024 and 65535')
+            note=body.get('note','')
+            if not isinstance(note,str) or len(note)>1000:
+                raise ValueError('Use a short voice/licence note')
+            updated=json.loads(json.dumps(self.settings))
+            config=updated.setdefault('voiceStudio',{})
+            config.update(url=f'http://127.0.0.1:{port}',asrEngine=body.get('asrEngine','faster-whisper'))
+            config.setdefault('profiles',{})[alias]={'engine':body.get('engine'),'voice':body.get('voice'),
+                    'language':language,'speed':body.get('speed',1.0),'note':note.strip()}
+            profile({'voiceAlias':alias,'language':language},updated)
+            path=self.root/'settings.tmp'
+            fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_TRUNC,0o600)
+            with os.fdopen(fd,'w') as out: json.dump(updated,out,indent=2)
+            os.replace(path,self.root/'settings.json')
+            self.settings.clear(); self.settings.update(updated)
+            return {'saved':True,'voiceAlias':alias,'note':'Existing jobs retain pinned voice settings. Run VoiceStudio Connection Check, then an audio sample before generating a real video.'}
+
     def work(self, ident):
         with self.browser:
             try:
@@ -152,7 +177,7 @@ class Service:
                     raise ValueError('Narration can only be rebuilt on a stopped job')
                 for name in ('narration.mp3', 'captions.srt', 'final.mp4'):
                     (self.root/'jobs'/ident/name).unlink(missing_ok=True)
-                for pattern in ('scene-voice-*', 'scene-captions-*'):
+                for pattern in ('scene-voice-*', 'scene-captions-*', 'vs-*'):
                     for file in (self.root/'jobs'/ident).glob(pattern):
                         file.unlink(missing_ok=True)
                 self.store.update(ident, 'needs_attention', 'Narration cleared. Safe Resume will rebuild audio/captions and reuse completed scenes.')
@@ -239,6 +264,47 @@ def make_handler(service, token):
                     'optionalEditor': editor_status(service.settings, service.root)})
             if method == 'POST' and path == '/v1/analytics/snapshot':
                 return self.send_json(200, service.growth.save(body))
+            if path == '/v1/setup/voicestudio' and method == 'POST':
+                return self.send_json(200, service.configure_voice(body))
+            if path == '/v1/setup/voicestudio' and method == 'GET':
+                from .voicestudio import Client
+                config=service.settings.get('voiceStudio',{})
+                inventory=Client(config,service.root).inventory()
+                return self.send_json(200, {**inventory, 'profiles':config.get('profiles',{}),
+                    'asrEngine':config.get('asrEngine','faster-whisper'),
+                    'note':'Inventory only. Use Preflight and Audio Sample for synthesis/ASR checks.'})
+            if path == '/v1/voicestudio/sample' and method == 'POST':
+                from .voicestudio import Client, profile
+                text=body.get('text')
+                if not isinstance(text,str) or not text.strip() or len(text)>300 or body.get('language') not in ('English','Hindi'):
+                    raise ValueError('Choose a language and sample text of 1–300 characters')
+                sample_id=body.get('sampleId') or secrets.token_hex(16)
+                if not isinstance(sample_id,str) or not re.fullmatch(r'[a-f0-9]{32}',sample_id):
+                    raise ValueError('Use a valid sample ID or leave it blank')
+                with service.mutations:
+                    config=profile(body,service.settings)
+                if not service.browser.acquire(blocking=False):
+                    return self.send_json(409, {'error':'The worker is busy; wait before requesting an audio sample.'})
+                try:
+                    folder=service.root/'samples'/sample_id; folder.mkdir(parents=True,exist_ok=True)
+                    client=Client(config,service.root); client.preflight()
+                    client.unit(text.strip(),folder/'vs-sample',service.pipeline.command)
+                    return self.send_json(200, {'sampleId':sample_id,'audioUrl':f'/v1/voicestudio/samples/{sample_id}/audio',
+                        'captionUrl':f'/v1/voicestudio/samples/{sample_id}/captions','flowCreditsSpent':0,
+                        'note':'Listen for voice quality, pronunciation and caption accuracy. This sample does not submit a video job.'})
+                except StopJob as exc:
+                    return self.send_json(409, {'sampleId':sample_id,'state':exc.state,'detail':exc.detail,
+                        'note':'Use this Sample ID with identical text/settings to resume saved speech after fixing the issue.'})
+                finally:
+                    service.browser.release()
+            sample=re.fullmatch(r'/v1/voicestudio/samples/([a-f0-9]{32})/(audio|captions)',path)
+            if sample and method=='GET':
+                ident,kind=sample.groups(); file=service.root/'samples'/ident/('vs-sample.mp3' if kind=='audio' else 'vs-sample.srt')
+                if not file.is_file(): raise KeyError('Sample is not ready')
+                self.send_response(200); self.send_header('Content-Type','audio/mpeg' if kind=='audio' else 'application/x-subrip')
+                self.send_header('Content-Length',str(file.stat().st_size)); self.send_header('Cache-Control','no-store'); self.end_headers()
+                with file.open('rb') as stream: shutil.copyfileobj(stream,self.wfile)
+                return
             if path == '/v1/characters' and method == 'GET':
                 return self.send_json(200, service.studio.library())
             if path == '/v1/characters' and method == 'POST':

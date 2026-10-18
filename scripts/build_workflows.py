@@ -75,6 +75,8 @@ story_form = form('Story Submission Form', 'Create a WonderTales video', 'wonder
     field('Cast names (optional; two or three, comma-separated)'),
     field('Scene plan (optional)', kind='textarea'),
     field('Visual style (optional)'),
+    field('Audio provider', ['Current online narrator (default)', 'VoiceStudio local', 'My audio + SRT']),
+    field('VoiceStudio voice alias (optional; uses language default)'),
     field('Your audio path (optional; requires matching SRT)'),
     field('Your captions SRT path (optional)'),
     field('Variant label (optional; change only for an intentional new version)')])
@@ -140,6 +142,8 @@ return [{json:{title, story, language, aspectRatio, durationSeconds, variant,
  selectedCharacters:chosen, creditCostPerClip, maxCreditsPerJob, storyboard,
  characterLibraryVersion:hasLocalRegistry ? 'local-registry' : String(config.version || ''),
  ...(String(form['Visual style (optional)'] || '').trim() ? {visualStyle:String(form['Visual style (optional)']).trim()} : {}),
+ ttsProvider:form['Audio provider'] === 'VoiceStudio local' ? 'voicestudio' : form['Audio provider'] === 'My audio + SRT' ? 'owner' : 'edge',
+ voiceAlias:String(form['VoiceStudio voice alias (optional; uses language default)'] || '').trim(),
  audioFile:String(form['Your audio path (optional; requires matching SRT)'] || '').trim(),
  captionFile:String(form['Your captions SRT path (optional)'] || '').trim(),
  editor:form['Editor (blank uses built-in)'] === 'MoneyPrinterTurbo' ? 'moneyprinterturbo' : 'builtin',
@@ -413,3 +417,29 @@ retention_schedule['position']=[0,220]; data['nodes'].append(retention_schedule)
 data['connections'][retention_schedule['name']]={'main':[[{'node':retention_config['name'],'type':'main','index':0}]]}
 data['settings']['timezone']='Asia/Kolkata'
 path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+
+vs_form=form('VoiceStudio Settings Form','Register a local VoiceStudio narrator','wondertales-voice-settings',[
+ field('Voice alias (english-main or hindi-main)',required=True),field('Language',['English','Hindi'],True),
+ field('Engine',['kittentts','omnivoice-gguf'],True),field('Voice ID (preset or existing profile ID)',required=True),
+ field('Speed (blank uses 1)'),field('Local port (blank uses 3900)'),
+ field('Pinned local ASR',['faster-whisper','whisperx'],True),field('Voice use / licence notes (optional)',kind='textarea')])
+vs_prepare=code('Prepare VoiceStudio Mapping',r'''
+const f=$input.first().json;
+return [{json:{alias:String(f['Voice alias (english-main or hindi-main)'] || '').trim(),language:f.Language,engine:f.Engine,
+ voice:String(f['Voice ID (preset or existing profile ID)'] || '').trim(),speed:Number(f['Speed (blank uses 1)'] || 1),
+ port:Number(f['Local port (blank uses 3900)'] || 3900),asrEngine:f['Pinned local ASR'],note:String(f['Voice use / licence notes (optional)'] || '').trim()}}];
+'''.strip(),240)
+save('WonderTales — VoiceStudio Settings','19-voicestudio-settings.json',[vs_form,vs_prepare,http('Save Private Voice Alias',BASE+'/v1/setup/voicestudio',480,'POST','={{ $json }}')])
+vs_check=node('Check VoiceStudio Inventory','manualTrigger',{},0)
+vs_inventory=http('List Local Voices and Engines',BASE+'/v1/setup/voicestudio',240)
+vs_inventory['parameters']['options']['timeout']=120000
+save('WonderTales — VoiceStudio Connection Check','20-voicestudio-check.json',[vs_check,vs_inventory])
+vs_sample_form=form('VoiceStudio Audio Sample Form','Test narration without Flow credits','wondertales-voice-sample',[
+ field('Language',['English','Hindi'],True),field('Voice alias (blank uses language default)'),
+ field('Sample text (up to 300 characters)',required=True,kind='textarea'),field('Sample ID (optional; reuse to resume saved speech)')])
+vs_sample_form['parameters']['formDescription']='Generates local speech and captions only. No Flow video or YouTube upload. First model loads/transcription can take several minutes. View or download the audio from n8n execution binary data.'
+vs_sample_code=code('Prepare Audio Sample',"const f=$input.first().json; return [{json:{language:f.Language,voiceAlias:String(f['Voice alias (blank uses language default)'] || '').trim(),text:String(f['Sample text (up to 300 characters)'] || '').trim(),sampleId:String(f['Sample ID (optional; reuse to resume saved speech)'] || '').trim()}}];",240)
+vs_sample_http=http('Generate Local Audio Sample',BASE+'/v1/voicestudio/sample',480,'POST','={{ $json }}')
+vs_sample_http['parameters']['options']['timeout']=1900000
+vs_download=http('Download Sample Audio',"={{ '"+BASE+"' + $json.audioUrl }}",720,download=True)
+save('WonderTales — VoiceStudio Audio Sample (no Flow credits)','21-voicestudio-sample.json',[vs_sample_form,vs_sample_code,vs_sample_http,vs_download])

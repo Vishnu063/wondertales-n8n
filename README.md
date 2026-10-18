@@ -2,7 +2,7 @@
 
 Turn your own children's stories, poems, and spoken nursery rhymes into animated videos, then upload them to YouTube as **Private**. Manage submissions, character profiles, credit caps, job status, recovery, and destination selection through n8n.
 
-**Status:** local worker and eighteen n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
+**Status:** local worker and twenty-one n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
 
 ## What it does
 
@@ -15,6 +15,14 @@ Turn your own children's stories, poems, and spoken nursery rhymes into animated
 - Stops on unverified login/balance, CAPTCHA/provider failures, uncertain billing, and uncertain uploads. Never automatically resubmits an uncertain scene or reclaims an uncertain upload.
 
 See [feature verification status](docs/FEATURES.md) and the [editor and growth setup guide](docs/EDITOR_AND_GROWTH.md).
+
+## Added: VoiceStudio audio provider
+
+Use your [VoiceStudio repository](https://github.com/Vishnu063/VoiceStudio) as an optional local speech/caption service. Choose **VoiceStudio local** and a saved voice alias in the story form. English KittenTTS presets and multilingual OmniVoice GGUF profiles are supported explicitly; unknown/default engine aliases and remote ASR are rejected.
+
+Workflows **19–21** save private voice mappings, list local profiles/engines, and generate a downloadable audio sample **without Flow credits or YouTube upload**. Narration/captions finish and pass timing checks before video generation. Saved speech survives caption failures and Safe Resume, avoiding needless synthesis. Existing queued jobs keep their selected voice settings.
+
+VoiceStudio remains a separate service/environment. It adds no paid audio API, but its app/models need disk, RAM and CPU; GGUF source checkouts need a working native binary. It has **not** been installed, benchmarked or listened to on the owner's machine here. See the [VoiceStudio setup guide](docs/VOICESTUDIO.md).
 
 ## Added: storyboard, continuity and scene revision controls
 
@@ -106,6 +114,9 @@ This is the recommended first setup. macOS and Linux are supported; Windows can 
 | 16 Character Continuity Library | Save and activate immutable character definitions with appearance, clothing, reference images and continuity notes |
 | 17 Single Scene Replacement | Preview the additional cost, then explicitly queue one replacement clip while preserving originals |
 | 18 Audience Retention Review | Read-only review for one public managed video; form or optional weekly schedule |
+| 19 VoiceStudio Settings | Save language, explicit engine, voice ID, speed and local ASR mapping privately |
+| 20 VoiceStudio Connection Check | List engine availability and saved voice profiles; does not synthesize audio |
+| 21 VoiceStudio Audio Sample | Generate and download speech/captions for listening before any Flow generation |
 
 Use the n8n execution data view to see outputs and detailed errors. These are workflow forms and execution results, not a separate custom dashboard. Save the returned job ID after submission.
 
