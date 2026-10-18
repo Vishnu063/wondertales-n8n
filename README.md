@@ -6,6 +6,7 @@ Create animated children's stories, poems and rhymes from your own scripts, then
 
 ## Contents
 
+- [Ubuntu quick start: install together](#ubuntu-quick-start-install-together)
 - [Features and costs](#features-and-costs)
 - [Choose where to run it](#choose-where-to-run-it)
 - [Install on your browser computer](#install-on-your-browser-computer)
@@ -70,6 +71,62 @@ Default endpoints:
 | `http://127.0.0.1:3900` | Optional VoiceStudio API/UI |
 
 Use SSH forwarding for remote access; do not open these service ports to the public internet. Keep the browser computer awake, the worker running and any tunnel connected during production.
+
+## Ubuntu quick start: install together
+
+Already cloned the repository? Start here. Run commands on the machine named above each block.
+
+| Your setup | What to install |
+| --- | --- |
+| EC2 hosts n8n; Chrome runs on your computer | Docker on EC2; worker dependencies on your browser computer |
+| Ubuntu graphical desktop hosts both | Docker and worker dependencies together on that desktop |
+
+**Node.js/npm are not required for the Docker route.** VoiceStudio and MoneyPrinterTurbo are optional; the basic video path uses Edge speech or your audio, plus FFmpeg.
+
+### A. EC2 server: install Docker
+
+Run in your EC2 SSH terminal:
+
+```bash
+(
+  set -e
+  sudo apt-get update
+  sudo apt-get install -y docker.io git curl
+  sudo systemctl enable --now docker
+  sudo docker version
+)
+```
+
+This installs and starts Docker, including startup after reboot. The subshell stops at the first failed command. Use `sudo docker` for the Docker commands in this README unless your user already has Docker access.
+
+Next, follow [Start n8n: Linux Docker route](#linux-docker-route-same-host-network-as-the-workertunnel), then [Run n8n on EC2](#run-n8n-on-ec2) to open the editor through SSH. No Node/npm installation is needed.
+
+### B. Ubuntu browser computer: install worker tools together
+
+Run on an Ubuntu machine with a graphical desktop and this repository already at `~/wondertales-n8n`:
+
+```bash
+(
+  set -e
+  sudo apt-get update
+  sudo apt-get install -y git curl python3 python3-venv ffmpeg fonts-noto-core
+  cd ~/wondertales-n8n
+  python3 -m venv .venv
+  .venv/bin/python -m pip install -r requirements.txt
+  .venv/bin/playwright install --with-deps chromium
+  bash scripts/start.sh --doctor
+)
+```
+
+This installs the Python environment, project dependencies, browser automation runtime, FFmpeg and Hindi fonts together. Python must be **3.11 or newer**; if venv fails, install the package matching your Python version (for example `python3.14-venv`) and rerun the block. Playwright may request sudo for system packages.
+
+For **both n8n and the worker on this same Ubuntu desktop**, include `docker.io` in the apt install line above and run `sudo systemctl enable --now docker` afterward. Then use the Linux Docker n8n recipe.
+
+**Google Chrome is a separate requirement.** Install it from [Google Chrome](https://www.google.com/chrome/) and verify it opens on the desktop. Playwright Chromium does not replace the dedicated signed-in Chrome profile used by the login helper. After doctor checks, continue at [Sign into the dedicated Google browser profile](#5-sign-into-the-dedicated-google-browser-profile), then start the worker.
+
+A headless EC2 SSH shell does not provide that graphical login session. Installing worker tools on EC2 is possible, but does not make Flow login or video generation ready. In the EC2 + browser-computer setup, run the worker on the browser computer and connect it using the documented SSH tunnel. macOS users should follow [Install on your browser computer](#install-on-your-browser-computer); these apt commands are Ubuntu-only.
+
+Installation does not generate a video, sign into Google, import workflows or configure YouTube OAuth. Keep schedules inactive until credentials, character settings and credit limits are configured and the first private-video checks pass.
 
 ## Install on your browser computer
 
