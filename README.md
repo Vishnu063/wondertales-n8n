@@ -2,7 +2,7 @@
 
 Turn your own children's stories, poems, and spoken nursery rhymes into animated videos, then upload them to YouTube as **Private**. Manage submissions, character profiles, credit caps, job status, recovery, and destination selection through n8n.
 
-**Status:** local worker and fifteen n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
+**Status:** local worker and eighteen n8n workflow exports are implemented. Offline tests cover recovery, duplicate protection, and real FFmpeg assembly using synthetic clips. **A real Google Flow session, Edge narration, and YouTube OAuth/upload have not been tested with an owner's accounts yet.** Do not treat this as a live-verified production service.
 
 ## What it does
 
@@ -15,6 +15,16 @@ Turn your own children's stories, poems, and spoken nursery rhymes into animated
 - Stops on unverified login/balance, CAPTCHA/provider failures, uncertain billing, and uncertain uploads. Never automatically resubmits an uncertain scene or reclaims an uncertain upload.
 
 See [feature verification status](docs/FEATURES.md) and the [editor and growth setup guide](docs/EDITOR_AND_GROWTH.md).
+
+## Added: storyboard, continuity and scene revision controls
+
+- A scene plan supplies explicit actions, settings, cast and narration. Speech and captions are aligned to each scene before Flow generation.
+- Workflow **16 Character Continuity Library** saves versioned character definitions centrally; queued jobs retain their own snapshots. Local registry overrides remain available.
+- Workflow **17 Single Scene Replacement** previews one additional clip's credit estimate, then accepts an explicit request to create a separate revision reusing the other clips. Originals remain saved.
+- Supply your own narration or song plus matching UTF-8 SRT captions through the story form. Files stay inside the private imports folder; no transcription/paid singing service is used.
+- Workflow **18 Audience Retention Review** fetches read-only retention data for one public managed video and highlights measured intervals to inspect. It can run weekly or from its form.
+
+See the [storyboard and revision guide](docs/STORYBOARD_AND_REVISIONS.md) for the form format, credit safeguards and live-validation status.
 
 ## Added: optional editor and growth reports
 
@@ -66,7 +76,7 @@ This is the recommended first setup. macOS and Linux are supported; Windows can 
 
 **Local worker credential:** create an n8n **Header Auth** credential named `WonderTales Local Worker`. Header name: `X-WonderTales-Key`. Copy the value from `~/.local/share/wondertales/api-token` on your own computer into the credential. Select it on every HTTP Request node that calls `127.0.0.1:8099`. Never paste the token into workflow parameters, GitHub, a form, or a shared screenshot.
 
-**Characters:** in `01-story-intake`, open the visible `Character Registry` Edit Fields node. Each of ten slots has a name, face description, body/clothing description, and optional local reference image path. Fill at least two slots. For reference-image mode, copy the images into the worker's `imports` directory and enter their full local paths. All selected characters need an image. Character reference paths point to the worker computer, not EC2.
+**Characters:** preferably configure and run workflow 16 once to save a shared character library (see the storyboard guide). Leave the intake registries blank to use it. For a local override, in `01-story-intake`, open the visible `Character Registry` Edit Fields node. Each of ten slots has a name, face description, body/clothing description, and optional local reference image path. Fill at least two slots. For reference-image mode, copy the images into the worker's `imports` directory and enter their full local paths. All selected characters need an image. Character reference paths point to the worker computer, not EC2.
 
 **Credit settings:** in the visible `Credit Settings` node, enter the current per-clip cost shown in your Flow account and your maximum credits per job. These values deliberately have no account-specific defaults in this public repository. The server calculates the clip count and estimate itself, checks the cap, and checks the current Flow balance before each new scene. These are estimates based on your configured rate, not a binding Google price quote. If Google's balance API cannot read your account, the job stops rather than spending blindly. Longer videos use multiple generations. No unlimited generation is promised.
 
@@ -93,6 +103,9 @@ This is the recommended first setup. macOS and Linux are supported; Windows can 
 | 13 Weekly Growth Review | Monday report, or run manually: performance, credit estimates, rights notes and publication reminders |
 | 14 Story Review | Text-similarity check and rights/learning-goal reminders without browser access or generation |
 | 15 Thumbnail Preview | Download one of three saved video-frame candidates for your review |
+| 16 Character Continuity Library | Save and activate immutable character definitions with appearance, clothing, reference images and continuity notes |
+| 17 Single Scene Replacement | Preview the additional cost, then explicitly queue one replacement clip while preserving originals |
+| 18 Audience Retention Review | Read-only review for one public managed video; form or optional weekly schedule |
 
 Use the n8n execution data view to see outputs and detailed errors. These are workflow forms and execution results, not a separate custom dashboard. Save the returned job ID after submission.
 

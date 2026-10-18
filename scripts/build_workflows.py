@@ -72,11 +72,16 @@ story_form = form('Story Submission Form', 'Create a WonderTales video', 'wonder
     field('Subtitle style (MoneyPrinterTurbo only)', ['clean', 'kids']),
     field('Licensed music path (optional; MoneyPrinterTurbo only)'),
     field('Learning goal (optional)'), field('Rights / licence notes (optional)', kind='textarea'),
+    field('Cast names (optional; two or three, comma-separated)'),
+    field('Scene plan (optional)', kind='textarea'),
+    field('Visual style (optional)'),
+    field('Your audio path (optional; requires matching SRT)'),
+    field('Your captions SRT path (optional)'),
     field('Variant label (optional; change only for an intentional new version)')])
-story_form['parameters']['formDescription'] += ' Give the story an engaging opening, a clear problem and a satisfying ending. Use original or licensed characters/stories. Music paths point to the worker imports folder. Narration is spoken, not sung.'
+story_form['parameters']['formDescription'] += ' Give the story an engaging opening, a clear problem and a satisfying ending. Use original or licensed characters/stories. Music paths point to the worker imports folder. Narration defaults to spoken speech; your own audio can include singing. Scene plan: one block per scene with Characters:, Setting:, Action:, Narration: lines; separate blocks with ---. Use 4/8/12/15 scenes for 30/60/90/120 seconds. Scene narration replaces the main story for voice-over. Each scene gets up to 8 seconds (last scene may be shorter).'
 registry = {}
 for i in range(1, 11):
-    for suffix in ('name', 'face_prompt', 'body_prompt', 'reference_image'):
+    for suffix in ('name', 'face_prompt', 'body_prompt', 'reference_image', 'continuity_notes'):
         registry[f'character_{i:02}_{suffix}'] = ''
 registry_node = fields_node('Character Registry (edit in n8n)', registry, 240)
 config = fields_node('Credit Settings (configure in n8n)', {'creditCostPerClip': '', 'maxCreditsPerJob': ''}, 480)
@@ -92,11 +97,12 @@ if (!['Reference images','Text descriptions (less consistent)'].includes(form.Co
 const aspectRatio = form['Video format'] === '9:16 vertical' ? '9:16' : '16:9';
 const durationSeconds = {'30 seconds':30, '1 minute':60, '90 seconds':90, '2 minutes':120}[form['Target duration']];
 if (!title || !story || !durationSeconds || !['English','Hindi'].includes(language)) throw new Error('Check the story, language, and duration.');
-const pool = Array.from({length:10}, (_,i) => {
+const hasLocalRegistry = Object.entries(registry).some(([k,v])=>k.endsWith('_name') && String(v || '').trim());
+const pool = hasLocalRegistry ? Array.from({length:10}, (_,i) => {
   const slot = String(i+1).padStart(2,'0');
   const read = suffix => String(registry[`character_${slot}_${suffix}`] || '').trim();
-  return {name:read('name'), facePrompt:read('face_prompt'), bodyPrompt:read('body_prompt'), referenceImage:read('reference_image')};
-}).filter(c => c.name && c.facePrompt && c.bodyPrompt);
+  return {name:read('name'), facePrompt:read('face_prompt'), bodyPrompt:read('body_prompt'), referenceImage:read('reference_image'), continuityNotes:read('continuity_notes')};
+}).filter(c => c.name && c.facePrompt && c.bodyPrompt) : (config.characters || []).map(c=>({...c}));
 if (pool.length < 2) throw new Error('Fill in at least two character names, faces, and clothing descriptions in Character Registry.');
 if (new Set(pool.map(c=>c.name)).size !== pool.length) throw new Error('Use unique character names.');
 const variant = String(form['Variant label (optional; change only for an intentional new version)'] || '').trim();
@@ -106,13 +112,36 @@ for (const ch of JSON.stringify([title, story, language, aspectRatio, durationSe
 const random = () => { seed = (Math.imul(seed,1664525) + 1013904223) >>> 0; return seed / 4294967296; };
 for (let i=pool.length-1; i>0; i--) { const j=Math.floor(random()*(i+1)); [pool[i],pool[j]]=[pool[j],pool[i]]; }
 const count = Math.min(pool.length, random()<0.5 ? 2 : 3);
+const rawPlan=String(form['Scene plan (optional)'] || '').trim();
+const storyboard=rawPlan ? rawPlan.split(/\r?\n\s*---\s*\r?\n/).map(block=>{
+ const values={}; let previous='';
+ for(const line of block.trim().split(/\r?\n/)) {
+  const match=line.match(/^(Characters|Setting|Action|Narration):\s*(.*)$/i);
+  if(match){previous=match[1].toLowerCase(); if(previous in values) throw new Error('Each scene needs one line per field.'); values[previous]=match[2].trim();}
+  else if(previous){values[previous]+=' '+line.trim();}
+  else throw new Error('Start each scene with Characters:, Setting:, Action: and Narration: fields.');
+ }
+ if(['characters','setting','action','narration'].some(k=>!values[k])) throw new Error('Every scene needs Characters, Setting, Action and Narration.');
+ return {...values,characters:values.characters.split(',').map(x=>x.trim()).filter(Boolean)};
+}) : [];
+if(storyboard.length && storyboard.length!==Math.ceil(durationSeconds/8)) throw new Error('Use exactly '+Math.ceil(durationSeconds/8)+' storyboard scenes for this duration.');
+const explicit=String(form['Cast names (optional; two or three, comma-separated)'] || '').split(',').map(x=>x.trim()).filter(Boolean);
+const plannedNames=[...new Set(storyboard.flatMap(scene=>scene.characters))];
+const requestedNames=explicit.length ? explicit : plannedNames;
+if(requestedNames.length && (![2,3].includes(requestedNames.length) || new Set(requestedNames).size!==requestedNames.length || requestedNames.some(name=>!pool.some(c=>c.name===name)))) throw new Error('Choose two or three unique character names from the registry/library.');
+if(plannedNames.some(name=>!requestedNames.includes(name))) throw new Error('Scene characters must belong to the selected cast.');
+const chosen=requestedNames.length ? requestedNames.map(name=>pool.find(c=>c.name===name)) : pool.slice(0,count);
 const creditCostPerClip = Number(config.creditCostPerClip);
 const maxCreditsPerJob = Number(config.maxCreditsPerJob);
 if (!Number.isFinite(creditCostPerClip) || !Number.isFinite(maxCreditsPerJob) || !(creditCostPerClip>0) || !(maxCreditsPerJob>0)) throw new Error('Set the displayed Flow cost per clip and your per-job credit cap in Credit Settings.');
 return [{json:{title, story, language, aspectRatio, durationSeconds, variant,
  flowAccount:String(form['Flow account alias (blank uses flow-main)'] || 'flow-main').trim(),
  youtubeDestination:String(form['YouTube destination alias (blank uses channel-main)'] || 'channel-main').trim(),
- selectedCharacters:pool.slice(0,count), creditCostPerClip, maxCreditsPerJob,
+ selectedCharacters:chosen, creditCostPerClip, maxCreditsPerJob, storyboard,
+ characterLibraryVersion:hasLocalRegistry ? 'local-registry' : String(config.version || ''),
+ ...(String(form['Visual style (optional)'] || '').trim() ? {visualStyle:String(form['Visual style (optional)']).trim()} : {}),
+ audioFile:String(form['Your audio path (optional; requires matching SRT)'] || '').trim(),
+ captionFile:String(form['Your captions SRT path (optional)'] || '').trim(),
  editor:form['Editor (blank uses built-in)'] === 'MoneyPrinterTurbo' ? 'moneyprinterturbo' : 'builtin',
  subtitleStyle:form['Subtitle style (MoneyPrinterTurbo only)'] || 'clean',
  musicFile:String(form['Licensed music path (optional; MoneyPrinterTurbo only)'] || '').trim(),
@@ -192,6 +221,7 @@ const input = $('Story Submission Form').first().json;
 const raw = String(input['Story bank (title on first line; separate stories with ---)'] || '').trim();
 const blocks = raw.split(/\r?\n\s*---\s*\r?\n/).map(s=>s.trim()).filter(Boolean);
 if (!blocks.length || blocks.length>30) throw new Error('Submit between 1 and 30 stories. Separate blocks with a line containing ---');
+if (blocks.length>1 && (String(input['Scene plan (optional)'] || '').trim() || String(input['Your audio path (optional; requires matching SRT)'] || '').trim())) throw new Error('Use Story Intake for a custom storyboard or owner audio. A shared plan/audio would repeat across these stories.');
 const stories = blocks.map(block=>{
  const lines=block.split(/\r?\n/); const bankTitle=lines.shift().trim(); const bankStory=lines.join('\n').trim();
  if(!bankTitle || !bankStory) throw new Error('Every block needs a title on its first line, then story text below it.');
@@ -287,3 +317,99 @@ save('WonderTales — Thumbnail Preview', '15-thumbnail-preview.json',[thumb_for
 for filename in ('12-youtube-analytics.json','13-weekly-growth-review.json'):
  path=ROOT/filename; data=json.loads(path.read_text()); data['settings']['timezone']='Asia/Kolkata'
  path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+
+# Shared immutable character library; local registry overrides remain compatible.
+for filename in ('01-story-intake.json','02-preflight.json','08-story-bank.json','14-story-review.json'):
+ path=ROOT/filename; data=json.loads(path.read_text())
+ read_library=http('Read Shared Character Library',BASE+'/v1/characters',480)
+ data['nodes'].insert(2,read_library)
+ registry_name='Character Registry (edit in n8n)'; config_name='Credit Settings (configure in n8n)'
+ data['connections'][registry_name]={'main':[[{'node':read_library['name'],'type':'main','index':0}]]}
+ data['connections'][read_library['name']]={'main':[[{'node':config_name,'type':'main','index':0}]]}
+ for i,n in enumerate(data['nodes']): n['position']=[i*240,0]
+ path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+lib_trigger=node('Save Character Library', 'manualTrigger',{},0)
+lib_fields=fields_node('Character Continuity Sheet (edit here)',{'libraryVersion':'v1',**registry},240)
+lib_prepare=code('Prepare Versioned Character Library',r'''
+const f=$input.first().json;
+const characters=Array.from({length:10},(_,i)=>{
+ const slot=String(i+1).padStart(2,'0'); const get=s=>String(f[`character_${slot}_${s}`] || '').trim();
+ return {name:get('name'),facePrompt:get('face_prompt'),bodyPrompt:get('body_prompt'),referenceImage:get('reference_image'),continuityNotes:get('continuity_notes')};
+}).filter(c=>Object.values(c).some(Boolean));
+if(characters.length<2 || characters.some(c=>!c.name || !c.facePrompt || !c.bodyPrompt)) throw new Error('Fill at least two complete characters; leave unused slots fully blank.');
+return [{json:{version:String(f.libraryVersion || '').trim(),characters}}];
+'''.strip(),480)
+save('WonderTales — Character Continuity Library','16-character-library.json',[lib_trigger,lib_fields,lib_prepare,http('Save Immutable Library Version',BASE+'/v1/characters',720,'POST','={{ $json }}')])
+replace_form=form('Scene Replacement Form','Preview or request ONE scene replacement','wondertales-replace-scene',[
+ field('Source Job ID',required=True),field('Action',['Preview credit estimate','Request one scene replacement'],True),
+ field('Scene index (starts at 0)',required=True),field('Replacement direction',required=True,kind='textarea'),
+ field('Current credits per clip',required=True),field('Additional credit cap',required=True),
+ field('Replacement label (reuse same label when retrying)'),field('Confirmation (type REPLACE_ONE_SCENE only to request)')])
+replace_form['parameters']['formDescription']='Preview first. Requests queue ONE new paid scene and reuse the others. Your original video remains saved. A ready original is withheld from upload; an uploaded original stays unchanged. The daily limit and global pause still apply.'
+replace_prepare=code('Prepare Explicit Scene Revision',r'''
+const f=$input.first().json; const id=String(f['Source Job ID'] || '').trim();
+if(!/^[a-f0-9]{32}$/.test(id)) throw new Error('Enter a valid source Job ID.');
+const action={'Preview credit estimate':'preview-scene-replacement','Request one scene replacement':'replace-scene'}[f.Action];
+if(!action) throw new Error('Choose Preview or Request.');
+const sceneIndex=Number(f['Scene index (starts at 0)']);
+if(!Number.isInteger(sceneIndex) || String(f['Scene index (starts at 0)']).trim()==='') throw new Error('Enter the zero-based scene index.');
+return [{json:{id,action,body:{sceneIndex,direction:String(f['Replacement direction'] || '').trim(),creditCostPerClip:Number(f['Current credits per clip']),additionalCreditCap:Number(f['Additional credit cap']),requestLabel:String(f['Replacement label (reuse same label when retrying)'] || '').trim(),confirmation:String(f['Confirmation (type REPLACE_ONE_SCENE only to request)'] || '').trim()}}}];
+'''.strip(),240)
+replace_http=http('Preview or Queue Scene Revision',"={{ '"+BASE+"/v1/jobs/' + $json.id + '/' + $json.action }}",480,'POST','={{ $json.body }}')
+replace_http['parameters']['options']['timeout']=120000
+save('WonderTales — Single Scene Replacement','17-scene-replacement.json',[replace_form,replace_prepare,replace_http])
+
+retention_form=form('Retention Review Form','Inspect where viewing changes','wondertales-retention',[
+ field('Job ID (blank chooses an eligible public video)')])
+retention_config=fields_node('Retention Destination (configure)',{'destination':'channel-main','expectedChannelId':''},240)
+retention_report_http=http('Read Current Growth Report',BASE+'/v1/growth/report',480)
+retention_pick=code('Choose One Video for Retention',r'''
+const c=$('Retention Destination (configure)').first().json;
+if(!/^UC[A-Za-z0-9_-]{22}$/.test(c.expectedChannelId || '')) throw new Error('Set the expected channel ID and destination.');
+const report=$input.first().json;
+const requested=String(c['Job ID (blank chooses an eligible public video)'] || '').trim();
+if(requested && !/^[a-f0-9]{32}$/.test(requested)) throw new Error('Enter a valid Job ID.');
+if(requested) return [{json:{jobId:requested}}];
+const options=(report.topVideosByWatchedMinutes || []).filter(v=>v.destination===c.destination);
+const last=new Map((report.retention || []).map(r=>[r.jobId,r.snapshotAt || 0]));
+options.sort((a,b)=>(last.get(a.jobId)||0)-(last.get(b.jobId)||0));
+return options.length ? [{json:{jobId:options[0].jobId}}] : [];
+'''.strip(),720)
+retention_job=http('Read Managed Video Job',"={{ '"+BASE+"/v1/jobs/' + $json.jobId }}",960)
+retention_identity=http('Verify Retention Channel','https://www.googleapis.com/youtube/v3/channels?part=id&mine=true',1200,google=True)
+retention_guard=code('Guard Retention Ownership',r'''
+const c=$('Retention Destination (configure)').first().json; const job=$('Read Managed Video Job').first().json;
+if(job.state!=='uploaded' || job.body.youtubeDestination!==c.destination || !/^[A-Za-z0-9_-]{11}$/.test(job.youtube_id || '')) throw new Error('Choose an uploaded managed video for this destination.');
+if(!($input.first().json.items || []).some(x=>x.id===c.expectedChannelId)) throw new Error('YouTube OAuth channel mismatch.');
+return [{json:{jobId:job.id,video:job.youtube_id,destination:c.destination,channelId:c.expectedChannelId}}];
+'''.strip(),1440)
+retention_visibility=http('Verify Video Is Public',"={{ 'https://www.googleapis.com/youtube/v3/videos?part=id,snippet,status&id=' + encodeURIComponent($json.video) }}",1680,google=True)
+retention_query=code('Build Single Video Retention Query',r'''
+const c=$('Guard Retention Ownership').first().json;
+const v=($input.first().json.items || []).find(v=>v.id===c.video);
+if(!v || v.snippet?.channelId!==c.channelId || v.status?.privacyStatus!=='public') throw new Error('Retention review requires a verified public video on the selected channel.');
+const end=new Date(); end.setUTCDate(end.getUTCDate()-2); const start=new Date(end); start.setUTCDate(start.getUTCDate()-27);
+const startDate=start.toISOString().slice(0,10),endDate=end.toISOString().slice(0,10);
+const q={ids:'channel=='+c.channelId,startDate,endDate,dimensions:'elapsedVideoTimeRatio',metrics:'audienceWatchRatio,relativeRetentionPerformance',filters:'video=='+c.video};
+const url='https://youtubeanalytics.googleapis.com/v2/reports?'+Object.entries(q).map(([k,v])=>encodeURIComponent(k)+'='+encodeURIComponent(v)).join('&');
+return [{json:{...c,startDate,endDate,url}}];
+'''.strip(),1920)
+retention_fetch=http('Read Retention (read-only OAuth)','={{ $json.url }}',2160)
+retention_fetch['parameters']['genericAuthType']='oAuth2Api'
+retention_normalize=code('Normalize Retention Points',r'''
+const c=$('Build Single Video Retention Query').first().json; const r=$input.first().json;
+const names=(r.columnHeaders || []).map(h=>h.name); const required=['elapsedVideoTimeRatio','audienceWatchRatio','relativeRetentionPerformance'];
+if(r.error || required.some(k=>!names.includes(k))) throw new Error('Retention report failed or changed; previous data is preserved.');
+const points=(r.rows || []).map(row=>Object.fromEntries(required.map(k=>[k,row[names.indexOf(k)]])));
+return [{json:{jobId:c.jobId,destination:c.destination,channelId:c.channelId,video:c.video,startDate:c.startDate,endDate:c.endDate,points}}];
+'''.strip(),2400)
+retention_save=http('Save Private Retention Snapshot',BASE+'/v1/analytics/retention',2640,'POST','={{ $json }}')
+retention_result=http('Show Updated Retention Review',BASE+'/v1/growth/report',2880)
+retention_readable=code('Show Selected Video Review',"const id=$('Build Single Video Retention Query').first().json.jobId; return ($input.first().json.retention || []).filter(r=>r.jobId===id).map(r=>({json:r}));",3120)
+save('WonderTales — Audience Retention Review','18-audience-retention.json',[retention_form,retention_config,retention_report_http,retention_pick,retention_job,retention_identity,retention_guard,retention_visibility,retention_query,retention_fetch,retention_normalize,retention_save,retention_result,retention_readable])
+path=ROOT/'18-audience-retention.json'; data=json.loads(path.read_text())
+retention_schedule=node('Weekly Retention Monday 9 30 AM','scheduleTrigger',{'rule':{'interval':[{'field':'cronExpression','expression':'30 9 * * 1'}]}},0,1.2)
+retention_schedule['position']=[0,220]; data['nodes'].append(retention_schedule)
+data['connections'][retention_schedule['name']]={'main':[[{'node':retention_config['name'],'type':'main','index':0}]]}
+data['settings']['timezone']='Asia/Kolkata'
+path.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')

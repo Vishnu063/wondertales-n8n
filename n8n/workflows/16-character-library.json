@@ -1,0 +1,417 @@
+{
+  "name": "WonderTales — Character Continuity Library",
+  "nodes": [
+    {
+      "id": "787fd33a-8cf4-5339-bcf8-3a2ca6de0c83",
+      "name": "Save Character Library",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "f1d4516c-2a3d-5b25-8273-bf4d7cc73a9e",
+      "name": "Character Continuity Sheet (edit here)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "libraryVersion",
+              "name": "libraryVersion",
+              "value": "v1",
+              "type": "string"
+            },
+            {
+              "id": "character_01_name",
+              "name": "character_01_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_01_face_prompt",
+              "name": "character_01_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_01_body_prompt",
+              "name": "character_01_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_01_reference_image",
+              "name": "character_01_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_01_continuity_notes",
+              "name": "character_01_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_02_name",
+              "name": "character_02_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_02_face_prompt",
+              "name": "character_02_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_02_body_prompt",
+              "name": "character_02_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_02_reference_image",
+              "name": "character_02_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_02_continuity_notes",
+              "name": "character_02_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_03_name",
+              "name": "character_03_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_03_face_prompt",
+              "name": "character_03_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_03_body_prompt",
+              "name": "character_03_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_03_reference_image",
+              "name": "character_03_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_03_continuity_notes",
+              "name": "character_03_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_04_name",
+              "name": "character_04_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_04_face_prompt",
+              "name": "character_04_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_04_body_prompt",
+              "name": "character_04_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_04_reference_image",
+              "name": "character_04_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_04_continuity_notes",
+              "name": "character_04_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_05_name",
+              "name": "character_05_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_05_face_prompt",
+              "name": "character_05_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_05_body_prompt",
+              "name": "character_05_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_05_reference_image",
+              "name": "character_05_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_05_continuity_notes",
+              "name": "character_05_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_06_name",
+              "name": "character_06_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_06_face_prompt",
+              "name": "character_06_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_06_body_prompt",
+              "name": "character_06_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_06_reference_image",
+              "name": "character_06_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_06_continuity_notes",
+              "name": "character_06_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_07_name",
+              "name": "character_07_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_07_face_prompt",
+              "name": "character_07_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_07_body_prompt",
+              "name": "character_07_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_07_reference_image",
+              "name": "character_07_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_07_continuity_notes",
+              "name": "character_07_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_08_name",
+              "name": "character_08_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_08_face_prompt",
+              "name": "character_08_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_08_body_prompt",
+              "name": "character_08_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_08_reference_image",
+              "name": "character_08_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_08_continuity_notes",
+              "name": "character_08_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_09_name",
+              "name": "character_09_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_09_face_prompt",
+              "name": "character_09_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_09_body_prompt",
+              "name": "character_09_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_09_reference_image",
+              "name": "character_09_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_09_continuity_notes",
+              "name": "character_09_continuity_notes",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_10_name",
+              "name": "character_10_name",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_10_face_prompt",
+              "name": "character_10_face_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_10_body_prompt",
+              "name": "character_10_body_prompt",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_10_reference_image",
+              "name": "character_10_reference_image",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "character_10_continuity_notes",
+              "name": "character_10_continuity_notes",
+              "value": "",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "3f438a06-133b-5c7b-b7ee-d3b640fa15e2",
+      "name": "Prepare Versioned Character Library",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const f=$input.first().json;\nconst characters=Array.from({length:10},(_,i)=>{\n const slot=String(i+1).padStart(2,'0'); const get=s=>String(f[`character_${slot}_${s}`] || '').trim();\n return {name:get('name'),facePrompt:get('face_prompt'),bodyPrompt:get('body_prompt'),referenceImage:get('reference_image'),continuityNotes:get('continuity_notes')};\n}).filter(c=>Object.values(c).some(Boolean));\nif(characters.length<2 || characters.some(c=>!c.name || !c.facePrompt || !c.bodyPrompt)) throw new Error('Fill at least two complete characters; leave unused slots fully blank.');\nreturn [{json:{version:String(f.libraryVersion || '').trim(),characters}}];"
+      }
+    },
+    {
+      "id": "d7ffb41b-86b6-5806-a3e7-303095afc79d",
+      "name": "Save Immutable Library Version",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "url": "http://127.0.0.1:8099/v1/characters",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 30000
+        },
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Save Character Library": {
+      "main": [
+        [
+          {
+            "node": "Character Continuity Sheet (edit here)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Continuity Sheet (edit here)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Versioned Character Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Versioned Character Library": {
+      "main": [
+        [
+          {
+            "node": "Save Immutable Library Version",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

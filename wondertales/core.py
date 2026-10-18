@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import copy
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
@@ -25,15 +26,18 @@ class StopJob(Exception):
 def validate(body, settings):
     keys = {"title", "story", "language", "aspectRatio", "flowAccount", "youtubeDestination",
             "durationSeconds", "selectedCharacters", "consistencyMode", "creditCostPerClip", "maxCreditsPerJob", "variant",
-            "editor", "subtitleStyle", "musicFile", "musicVolume", "learningGoal", "rightsNote"}
-    b = {k: v for k, v in body.items() if k in keys}
+            "editor", "subtitleStyle", "musicFile", "musicVolume", "learningGoal", "rightsNote",
+            "storyboard", "visualStyle", "characterLibraryVersion", "audioFile", "captionFile"}
+    b = copy.deepcopy({k: v for k, v in body.items() if k in keys})
     b.setdefault('editor', 'builtin')
     b.setdefault('subtitleStyle', 'clean')
     if b['editor'] not in ('builtin', 'moneyprinterturbo') or b['subtitleStyle'] not in ('clean', 'kids'):
         raise ValueError('Choose a supported editor and subtitle style')
-    for key in ('musicFile', 'learningGoal', 'rightsNote', 'variant'):
+    for key in ('musicFile', 'learningGoal', 'rightsNote', 'variant', 'audioFile', 'captionFile'):
         if key in b and (not isinstance(b[key], str) or len(b[key]) > 2000):
             raise ValueError(f'Use text up to 2000 characters for {key}')
+        if key in b:
+            b[key] = b[key].strip()
     volume = b.get('musicVolume', 0.12)
     if isinstance(volume, bool) or not isinstance(volume, (int, float)) or not math.isfinite(volume) or not 0 < volume <= 0.3:
         raise ValueError('Music volume must be greater than zero and at most 0.3')
@@ -76,6 +80,10 @@ def validate(body, settings):
             raise ValueError(f'Configure a positive {key} in n8n first')
     b.update(model='veo-lite', uploadVisibility='private', madeForKids=True,
              plannedSceneCount=math.ceil(b['durationSeconds'] / 8))
+    if bool(b.get('audioFile', '').strip()) != bool(b.get('captionFile', '').strip()):
+        raise ValueError('Supply both your audio file and matching SRT captions, or leave both blank')
+    from .studio import validate_plan
+    validate_plan(b)
     b['estimatedCredits'] = b['plannedSceneCount'] * b['creditCostPerClip']
     if b['estimatedCredits'] > b['maxCreditsPerJob']:
         raise ValueError('Estimated credits exceed the per-job cap. Change duration or the cap in n8n.')
@@ -292,25 +300,33 @@ class Pipeline:
         except (ValueError, KeyError, TypeError):
             raise StopJob('blocked_balance', 'Flow did not return a verifiable balance. Check account/CLI compatibility before Safe Resume; no generation was submitted.')
 
-    def preflight(self, body, remaining=None, *, check_editor=True):
+    def preflight(self, body, remaining=None, *, check_editor=True, work=None):
         if check_editor:
             from .editor import preflight
             preflight(body, self.settings, self.state_dir)
+            from .audio import owner_assets
+            owner_assets(body, self.settings)
         account = {'profile': body.get('flowProfile') or self.settings['accounts'][body['flowAccount']]['profile'],
                    'project': body.get('flowProject', '')}
         if not isinstance(account.get('profile'), str) or not re.fullmatch(r'[A-Za-z0-9_-]+', account['profile']):
             raise StopJob('needs_attention', 'Configure a dedicated Flow profile in the local accounts file.')
         refs = []
         if body.get('consistencyMode', 'reference') == 'reference':
-            for c in body['selectedCharacters']:
+            for index, c in enumerate(body['selectedCharacters']):
                 try:
-                    path = allowed_file(c.get('referenceImage', ''), self.settings['importsDir'])
+                    suffix = Path(c.get('referenceImage', '')).suffix.lower()
+                    cached = Path(work)/f'reference-{index}{suffix}' if work else None
+                    path = allowed_file(cached, work) if cached and cached.exists() else allowed_file(c.get('referenceImage', ''), self.settings['importsDir'])
                 except ValueError:
                     raise StopJob('needs_references', 'Add one local reference image per selected character, or explicitly select text-only consistency.')
                 if path.suffix.lower() not in ('.png', '.jpg', '.jpeg', '.webp'):
                     raise StopJob('needs_references', 'Use PNG, JPEG, or WebP character references.')
+                if c.get('referenceSha256') and hashlib.sha256(path.read_bytes()).hexdigest() != c['referenceSha256']:
+                    raise StopJob('needs_references', 'A saved character reference changed. Restore the versioned reference image or submit a job with a new character library version.')
                 refs.append(path)
         needed = (remaining if remaining is not None else body['plannedSceneCount']) * body['creditCostPerClip']
+        if needed > body.get('replacementCreditCap', body['maxCreditsPerJob']):
+            raise StopJob('needs_attention', 'Remaining generation estimate exceeds this job or scene-replacement credit cap.')
         balance = self.balance(account['profile'])
         if needed > balance:
             raise StopJob('blocked_credit', 'The estimated remaining scene cost exceeds the current Flow balance. Wait for credits or shorten the video.')
@@ -336,15 +352,27 @@ class Pipeline:
         required = ['ffmpeg', 'ffprobe']
         if pending:
             required.append('gflow')
-        if not (work/'narration.mp3').exists() or not (work/'captions.srt').exists():
+        if not body.get('audioFile') and (not (work/'narration.mp3').exists() or not (work/'captions.srt').exists()):
             required.append('edge-tts')
         for binary in required:
             if not shutil.which(binary):
                 raise StopJob('needs_setup', f'Install the missing tool: {binary}')
         pending = [s for s in job['scenes'] if s['state'] != 'done']
-        account, refs = self.preflight(body, len(pending), check_editor=False) if pending else (self.settings['accounts'][body['flowAccount']], [])
+        # Check every reused clip before submitting any pending replacement scene.
+        for saved in job['scenes']:
+            if saved['state'] == 'done':
+                if not saved['path'] or not Path(saved['path']).is_file() or float(probe(saved['path'])['format']['duration']) < 7.5:
+                    raise StopJob('needs_reconciliation', 'Restore the completed original clips before resuming. They will not be regenerated automatically.')
+        account, refs = self.preflight(body, len(pending), check_editor=False, work=work) if pending else (self.settings['accounts'][body['flowAccount']], [])
+        for index, path in enumerate(refs):
+            cached = work/f'reference-{index}{path.suffix.lower()}'
+            if path.resolve() != cached.resolve():
+                shutil.copyfile(path, cached)
+            refs[index] = cached
         self.store.update(ident, 'narrating', 'Preparing one consistent narration and timed captions before spending Flow credits.')
         audio, captions = work/'narration.mp3', work/'captions.srt'
+        from .audio import prepare
+        prepare(body, self.settings, work, self.command)
         if not audio.exists() or not captions.exists():
             voice = self.settings.get('voices', {}).get(body['language'],
                        'hi-IN-SwaraNeural' if body['language'] == 'Hindi' else 'en-IN-NeerjaNeural')
@@ -352,7 +380,8 @@ class Pipeline:
                                    '--write-media', audio, '--write-subtitles', captions])
             if result.returncode or not audio.exists() or not captions.exists() or not captions.stat().st_size:
                 raise StopJob('needs_attention', 'Narration/caption service failed. No additional Flow credits will be spent; resume when it is available.')
-        if float(probe(audio)['format']['duration']) > body['durationSeconds'] - 0.2:
+        margin = 0.1 if body.get('storyboard') or body.get('audioFile') else -0.2
+        if float(probe(audio)['format']['duration']) > body['durationSeconds'] + margin:
             raise StopJob('story_too_long', 'The spoken story is too long for this duration. Submit a shorter story or select a longer duration; no new Flow clips were generated.')
         if 'subtitles' not in self.command(['ffmpeg', '-hide_banner', '-filters']).stdout:
             raise StopJob('needs_setup', 'Install an FFmpeg build with the subtitles/libass filter before generation.')
@@ -367,10 +396,17 @@ class Pipeline:
             if scene['state'] != 'done':
                 if self.store.is_paused():
                     raise StopJob('paused', 'Paused at a safe scene boundary. Completed clips are preserved.')
-                self.preflight(body, sum(s['state'] != 'done' for s in self.store.get(ident)['scenes']), check_editor=False)
+                self.preflight(body, sum(s['state'] != 'done' for s in self.store.get(ident)['scenes']), check_editor=False, work=work)
                 segment = ' '.join(words[len(words)*n//total:len(words)*(n+1)//total])
-                identities = '\n'.join(f"{c['name']}: {c['facePrompt']}; {c['bodyPrompt']}" for c in body['selectedCharacters'])
-                prompt = (f'Child-friendly polished 3D animation for ages 8 to 10. Scene {n+1} of {total}. '
+                cast = body['selectedCharacters']
+                if body.get('storyboard'):
+                    planned = body['storyboard'][n]
+                    segment = f"Setting: {planned['setting']}. Action: {planned['action']}. Narration context: {planned['narration']}"
+                    cast = [c for c in cast if c['name'] in planned['characters']]
+                if body.get('replacementScene') == n:
+                    segment += '\nOwner replacement direction: '+body['replacementDirection']
+                identities = '\n'.join(f"{c['name']}: {c['facePrompt']}; {c['bodyPrompt']}; continuity: {c.get('continuityNotes', '')}" for c in cast)
+                prompt = (f"Child-friendly animation for ages 8 to 10. Style: {body.get('visualStyle', 'polished 3D animation')}. Scene {n+1} of {total}. "
                           f'Only these characters may appear; keep their identity and clothing unchanged:\n{identities}\n'
                           f'Story moment: {segment}\nClear visual storytelling, expressive movement, warm light. '
                           'No written text, no dialogue or singing; narration will be added separately.')
@@ -379,7 +415,8 @@ class Pipeline:
                         '--profile', account['profile'], '--out-dir', work, '--json']
                 if account.get('project'):
                     args += ['--project', account['project']]
-                for ref in refs:
+                scene_refs = [refs[body['selectedCharacters'].index(c)] for c in cast] if refs else []
+                for ref in scene_refs:
                     args += ['--ref', ref]
                 if self.store.is_paused():
                     raise StopJob('paused', 'Paused before submitting the next paid scene.')
@@ -436,7 +473,8 @@ class Pipeline:
         if levels.returncode or not level or level.group(1) == '-inf' or float(level.group(1)) < -50:
             raise StopJob('needs_attention', 'Narration appears silent or could not be measured. Review audio before uploading.')
         report.update(captions='timed and burned in', consistency=body.get('consistencyMode', 'reference'),
-                      narration='spoken, not sung', finalFile='final.mp4',
+                      narration='owner-supplied audio' if body.get('audioFile') else 'aligned scene speech' if body.get('storyboard') else 'spoken, not sung', finalFile='final.mp4',
+                      characterLibraryVersion=body.get('characterLibraryVersion', ''), storyboard=bool(body.get('storyboard')),
                       editor=body.get('editor', 'builtin'), storyReview=check,
                       music='owner-supplied local file' if body.get('musicFile') else 'none')
         report['titleSuggestions'] = [body['title']]

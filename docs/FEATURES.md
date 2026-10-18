@@ -51,3 +51,13 @@ The added workflows are 08 Story Bank, 09 Daily Queue Manager, 10 Queue Controls
 - Owner-text title suggestions and three saved video-frame candidates, previewable through n8n.
 
 See [setup, limitations and first live run](EDITOR_AND_GROWTH.md). Offline fixtures test contracts, failure recovery, FFmpeg preparation and workflow JavaScript. Actual upstream rendering, OAuth APIs and imported n8n execution still require live owner-account validation.
+
+## Storyboard and scene-editing additions
+
+- Explicit scene plans with actions/settings/cast, scene-aligned narration/captions, and voice-length checks before new Flow spending.
+- Shared immutable character library versions, continuity notes, reference hashes and per-job reference snapshots; legacy local registries remain available.
+- Owner audio/song plus matching SRT input, without paid transcription or song-generation services.
+- Explicit one-scene revision requests: preview additional credits, type confirmation, reuse other clips, preserve originals and deduplicate retried requests.
+- Public-video retention analysis, one video per run, account guards, rolling-window snapshots and labelled intervals to inspect; no automatic creative changes.
+
+Workflows 16–18 are inactive until configured. See the [storyboard/revision guide](STORYBOARD_AND_REVISIONS.md) for operation and live-test limitations.

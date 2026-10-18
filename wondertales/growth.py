@@ -17,7 +17,7 @@ def story_check(body, jobs, ident=None):
     current = next((j for j in jobs if j['id'] == ident), None)
     similar = []
     for job in jobs:
-        if job['id'] == ident or job['state'] == 'archived':
+        if job['id'] == ident or job['state'] in ('archived','cancelled'):
             continue
         if current and job['created'] >= current['created']:
             continue
@@ -45,11 +45,16 @@ def cost_report(job):
     b = job['body']
     submitted = sum(s['state'] in ('done', 'generating', 'uncertain') for s in job['scenes'])
     uncertain = sum(s['state'] in ('generating', 'uncertain') for s in job['scenes'])
+    new_submissions = max(0, submitted - b.get('reusedSceneCount', 0))
     return {'jobId': job['id'], 'title': b['title'], 'editor': b.get('editor', 'builtin'),
             'plannedCredits': b.get('estimatedCredits', b['plannedSceneCount'] * b['creditCostPerClip']),
             'submittedOrRecoveredScenes': submitted, 'uncertainScenes': uncertain,
-            'submittedSceneCreditEstimate': round(submitted * b['creditCostPerClip'], 3),
+            'submittedSceneCreditEstimate': round(new_submissions * b['creditCostPerClip'], 3),
+            'submittedNewScenes': new_submissions,
             'reusableClips': sum(s['state'] == 'done' for s in job['scenes']),
+            'reusedFromSourceJob': b.get('reusedSceneCount', 0),
+            'revisionOf': b.get('revisionOf'),
+            'newGenerationCreditEstimate': b.get('estimatedCredits', 0),
             'note': 'Configured-rate estimate, not actual Google billing. Recovered clips may have been generated outside this worker.'}
 
 

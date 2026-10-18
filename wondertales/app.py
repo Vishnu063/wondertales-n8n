@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 from .core import Pipeline, StopJob, Store, allowed_file, probe, validate
 from .queue import QueueManager
 from .growth import Growth, story_check, cost_report
+from .studio import Studio
 
 
 def load_settings(root):
@@ -55,6 +56,7 @@ class Service:
         self.browser = threading.Lock()
         self.manager = QueueManager(self)
         self.growth = Growth(self.store, settings)
+        self.studio = Studio(self.store, settings, root)
 
     def configure_accounts(self, body):
         if not self.browser.acquire(blocking=False):
@@ -124,7 +126,7 @@ class Service:
         with self.store.connect() as db:
             slot = db.execute('SELECT job FROM daily_dispatches WHERE day=?',(self.manager.day(),)).fetchone()
         job['canClaimUpload'] = job['state']=='ready' and not self.store.is_paused() and (slot is None or slot[0]==ident)
-        job['videoUrl'] = f'/v1/jobs/{ident}/video' if job['state'] in ('ready', 'uploading', 'uploaded', 'upload_uncertain') else None
+        job['videoUrl'] = f'/v1/jobs/{ident}/video' if job['state'] in ('ready', 'uploading', 'uploaded', 'upload_uncertain', 'superseded') else None
         from .queue import HUMAN
         job['nextAction'] = HUMAN.get(job['state'], 'Wait for the next balance check.' if job['state']=='blocked_credit' else 'Use Resume Everything in Queue Controls.' if job['state']=='paused' else 'No action needed.')
         job['youtubeUrl'] = f"https://www.youtube.com/watch?v={job['youtube_id']}" if job.get('youtube_id') else None
@@ -150,6 +152,9 @@ class Service:
                     raise ValueError('Narration can only be rebuilt on a stopped job')
                 for name in ('narration.mp3', 'captions.srt', 'final.mp4'):
                     (self.root/'jobs'/ident/name).unlink(missing_ok=True)
+                for pattern in ('scene-voice-*', 'scene-captions-*'):
+                    for file in (self.root/'jobs'/ident).glob(pattern):
+                        file.unlink(missing_ok=True)
                 self.store.update(ident, 'needs_attention', 'Narration cleared. Safe Resume will rebuild audio/captions and reuse completed scenes.')
             elif action == 'confirm-unsubmitted':
                 number = body.get('sceneIndex')
@@ -179,6 +184,8 @@ class Service:
             elif action == 'claim-upload':
                 claim = self.store.claim_upload(ident, body.get('destination'))
                 return {**self.public(ident), 'uploadClaim': claim}
+            elif action in ('preview-scene-replacement', 'replace-scene'):
+                return self.studio.replacement(ident, body, create=action=='replace-scene')
             elif action == 'complete-upload':
                 self.store.complete_upload(ident, body.get('uploadClaim'), body.get('youtubeId', ''))
             elif action == 'reconcile-upload':
@@ -232,11 +239,19 @@ def make_handler(service, token):
                     'optionalEditor': editor_status(service.settings, service.root)})
             if method == 'POST' and path == '/v1/analytics/snapshot':
                 return self.send_json(200, service.growth.save(body))
+            if path == '/v1/characters' and method == 'GET':
+                return self.send_json(200, service.studio.library())
+            if path == '/v1/characters' and method == 'POST':
+                with service.mutations:
+                    result = service.studio.save_library(body)
+                return self.send_json(200, result)
+            if path == '/v1/analytics/retention' and method == 'POST':
+                return self.send_json(200, service.studio.save_retention(body))
             if method == 'GET' and path == '/v1/analytics/jobs':
                 return self.send_json(200, {'jobs': [{'id': j['id'], 'destination': j['body']['youtubeDestination'],
                     'youtubeId': j['youtube_id']} for j in service.store.list(limit=None) if j.get('youtube_id')]})
             if method == 'GET' and path == '/v1/growth/report':
-                return self.send_json(200, service.growth.report())
+                return self.send_json(200, {**service.growth.report(), 'retention': service.studio.retention_report()})
             if method == 'POST' and path == '/v1/stories/check':
                 data = validate(body, service.settings)
                 return self.send_json(200, story_check(data, service.store.list(limit=None)))
@@ -293,7 +308,7 @@ def make_handler(service, token):
                 return self.send_json(200, service.action(ident, action, body))
             job = service.store.get(ident)
             if method == 'GET' and action in ('video', 'captions', 'thumbnail-1', 'thumbnail-2', 'thumbnail-3'):
-                if job['state'] not in ('ready', 'uploading', 'uploaded', 'upload_uncertain'):
+                if job['state'] not in ('ready', 'uploading', 'uploaded', 'upload_uncertain', 'superseded'):
                     raise ValueError('The final video is not ready')
                 filename = 'final.mp4' if action == 'video' else 'captions.srt' if action == 'captions' else action+'.jpg'
                 file = service.root/'jobs'/ident/filename

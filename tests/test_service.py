@@ -135,7 +135,8 @@ class ServiceTests(unittest.TestCase):
     def test_growth_endpoints_require_auth_and_story_check_spends_nothing(self):
         from test_growth import snapshot
         for path, data in [('/v1/growth/report', None), ('/v1/analytics/snapshot', snapshot()),
-                           ('/v1/analytics/jobs', None), ('/v1/stories/check', body())]:
+                           ('/v1/analytics/jobs', None), ('/v1/stories/check', body()),
+                           ('/v1/characters',None),('/v1/characters',{}),('/v1/analytics/retention',{})]:
             status, _ = self.request(path, data, token=False)
             self.assertEqual(status, 401)
         self.service.pipeline.command = Mock()

@@ -1,0 +1,143 @@
+{
+  "name": "WonderTales — Single Scene Replacement",
+  "nodes": [
+    {
+      "id": "eae70368-1646-5508-89db-4362ff9316c1",
+      "name": "Scene Replacement Form",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "path": "wondertales-replace-scene",
+        "formTitle": "Preview or request ONE scene replacement",
+        "formDescription": "Preview first. Requests queue ONE new paid scene and reuse the others. Your original video remains saved. A ready original is withheld from upload; an uploaded original stays unchanged. The daily limit and global pause still apply.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Source Job ID",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Action",
+              "fieldType": "dropdown",
+              "requiredField": true,
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Preview credit estimate"
+                  },
+                  {
+                    "option": "Request one scene replacement"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Scene index (starts at 0)",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Replacement direction",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Current credits per clip",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Additional credit cap",
+              "fieldType": "text",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Replacement label (reuse same label when retrying)",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldLabel": "Confirmation (type REPLACE_ONE_SCENE only to request)",
+              "fieldType": "text",
+              "requiredField": false
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "webhookId": "648c7fe6-b261-5a6a-a1aa-e4638befbe86"
+    },
+    {
+      "id": "83e93d34-9660-5574-a925-270a67c29d25",
+      "name": "Prepare Explicit Scene Revision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const f=$input.first().json; const id=String(f['Source Job ID'] || '').trim();\nif(!/^[a-f0-9]{32}$/.test(id)) throw new Error('Enter a valid source Job ID.');\nconst action={'Preview credit estimate':'preview-scene-replacement','Request one scene replacement':'replace-scene'}[f.Action];\nif(!action) throw new Error('Choose Preview or Request.');\nconst sceneIndex=Number(f['Scene index (starts at 0)']);\nif(!Number.isInteger(sceneIndex) || String(f['Scene index (starts at 0)']).trim()==='') throw new Error('Enter the zero-based scene index.');\nreturn [{json:{id,action,body:{sceneIndex,direction:String(f['Replacement direction'] || '').trim(),creditCostPerClip:Number(f['Current credits per clip']),additionalCreditCap:Number(f['Additional credit cap']),requestLabel:String(f['Replacement label (reuse same label when retrying)'] || '').trim(),confirmation:String(f['Confirmation (type REPLACE_ONE_SCENE only to request)'] || '').trim()}}}];"
+      }
+    },
+    {
+      "id": "feb38bb8-6350-5537-b536-8c945c2a533e",
+      "name": "Preview or Queue Scene Revision",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "url": "={{ 'http://127.0.0.1:8099/v1/jobs/' + $json.id + '/' + $json.action }}",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "options": {
+          "timeout": 120000
+        },
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.body }}"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Scene Replacement Form": {
+      "main": [
+        [
+          {
+            "node": "Prepare Explicit Scene Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Explicit Scene Revision": {
+      "main": [
+        [
+          {
+            "node": "Preview or Queue Scene Revision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

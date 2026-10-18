@@ -48,3 +48,43 @@ class MediaTests(unittest.TestCase):
                 self.assertEqual(len(calls),1,'Assembly resume must not regenerate a completed clip')
             report=quality(root/'jobs'/job['id']/'final.mp4','9:16',4)
             self.assertTrue(report['hasAudio'])
+
+    def test_real_single_scene_revision_generates_once_and_keeps_original_clips(self):
+        from wondertales.studio import Studio
+        from wondertales.growth import Growth
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp); config=settings(root); store=Store(root/'jobs.sqlite3')
+            # Shortened internal fixture keeps real codec testing inexpensive; public validation still restricts durations.
+            b=body(); b.update(durationSeconds=10,plannedSceneCount=2,estimatedCredits=2,model='veo-lite')
+            original,_=store.submit(b); work=root/'jobs'/original['id']; work.mkdir(parents=True)
+            for n in range(2):
+                clip=work/f'clip-{n:02}.mp4'
+                result=run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=c=blue:s=720x1280:r=2',
+                            '-t','8','-c:v','libx264','-preset','ultrafast',clip])
+                self.assertEqual(result.returncode,0,result.stderr); store.scene(original['id'],n,'done',clip)
+            result=run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=frequency=440:duration=1',work/'narration.mp3'])
+            self.assertEqual(result.returncode,0,result.stderr)
+            (work/'captions.srt').write_text('1\n00:00:00,000 --> 00:00:01,000\nAn original story.\n')
+            store.update(original['id'],'ready'); Growth(store,config)
+            revision=Studio(store,config,root).replacement(original['id'],{'sceneIndex':1,'creditCostPerClip':1,
+                'additionalCreditCap':1,'direction':'A clear close-up of the bird landing.','requestLabel':'fix-one',
+                'confirmation':'REPLACE_ONE_SCENE'},create=True)
+            pipe=Pipeline(store,config,root); generated=[]
+            def command(args,**kwargs):
+                args=[str(x) for x in args]
+                if args[0]=='gflow':
+                    if args[1:3]==['credits','user']: return subprocess.CompletedProcess(args,0,'{"credits":100}','')
+                    generated.append(args)
+                    self.assertIn('clear close-up',args[3])
+                    target=Path(args[args.index('--out-dir')+1])/'replacement.mp4'
+                    shutil.copyfile(work/'clip-01.mp4',target)
+                    return subprocess.CompletedProcess(args,0,json.dumps({'succeeded':True,'local_path':str(target)}),'')
+                self.assertNotEqual(args[0],'edge-tts','Saved narration should be reused')
+                return run(args,**kwargs)
+            pipe.command=command; original_which=shutil.which
+            with patch('wondertales.core.shutil.which',side_effect=lambda x:'/fake/gflow' if x=='gflow' else original_which(x)):
+                pipe.execute(revision['jobId'])
+            self.assertEqual(len(generated),1)
+            self.assertEqual(store.get(revision['jobId'])['state'],'ready')
+            self.assertEqual((root/'jobs'/revision['jobId']/'clip-00.mp4').read_bytes(),(work/'clip-00.mp4').read_bytes())
+            self.assertTrue((work/'clip-01.mp4').exists())
