@@ -2,7 +2,7 @@
 
 **Your story → a scene plan → Google Flow clips → Hypit film → your review.**
 
-A simpler replacement for the previous 21-workflow studio. Three n8n exports coordinate a local worker. The worker keeps character descriptions, optionally asks a small local Ollama model for visual direction, checks credit limits, generates scenes through your signed-in Flow browser, and uses **Hypit 0.3.1 to compose and render the picture and sound**. FFmpeg burns the planned captions and checks the final file.
+A simpler replacement for the previous 21-workflow studio. Four n8n exports coordinate a local worker and optional Private YouTube uploads. The worker keeps character descriptions, optionally asks a small local Ollama model for visual direction, checks credit limits, generates scenes through your signed-in Flow browser, and uses **Hypit 0.3.1 to compose and render the picture and sound**. FFmpeg burns the planned captions and checks the final file.
 
 **Code is implemented; your Google account, EC2 deployment and real Flow generation are not connected or live-tested.** This is not unlimited free AI video. Flow uses your account's credits. No Google generation API key or paid script-writing API is required by this integration.
 
@@ -10,14 +10,14 @@ A simpler replacement for the previous 21-workflow studio. Three n8n exports coo
 
 | Component | Responsibility |
 | --- | --- |
-| Local studio | One story form, plan review, progress, download, scene recovery and Settings |
+| Local studio | Story form, plan review, upload-details review, progress, download, recovery and Settings |
 | n8n | Story intake and queue/status reports; no AI reasoning or rendering inside n8n |
 | Planner | Exact supplied narration, scene breakdown, character/style memory; optional local AI visual descriptions |
 | Google Flow | Eight-second clips with requested narration, through pinned unofficial `gflow-cli` |
 | Hypit | Local SVML composition, audio placement and final video rendering |
 | Recovery | Durable scene checkpoints, reuse completed clips, explicit recovery after uncertain generation |
 
-The v1 editor, VoiceStudio, MoneyPrinterTurbo, analytics and YouTube upload workflows have been removed from the current version. **There is no automatic upload or publishing in v2.** Prior code remains in Git history. Private v1 data is not migrated or deleted; v2 uses a separate state directory.
+The v1 editor, VoiceStudio, MoneyPrinterTurbo and analytics workflows have been removed from the current version. **A new Private-only upload workflow replaces the old uploader. Public publishing is not included.** Prior code remains in Git history. Private v1 data is not migrated or deleted; v2 uses a separate state directory.
 
 ## 1. Prepare your computer
 
@@ -93,6 +93,7 @@ Import these **inactive** exports from `n8n/workflows`:
 | `01-story-plan.json` | Story form → save plan; no credit approval/generation |
 | `02-job-status.json` | Manual progress, completed jobs and recovery guidance |
 | `03-queue-monitor.json` | Hourly report of the already-approved queue |
+| `04-private-youtube-upload.json` | Check every ten minutes for approved video details, verify channel, upload Private, read back and record result |
 
 For each HTTP Request node, select a **Header Auth** credential:
 
@@ -101,7 +102,7 @@ For each HTTP Request node, select a **Header Auth** credential:
 
 Default worker URL: `http://127.0.0.1:8099`. Native n8n on the same host, or Linux Docker n8n using host networking, can use it directly. A bridge-network container needs deliberate host routing; its own `127.0.0.1` is not the worker. Do not expose worker or Google browser ports publicly.
 
-The n8n form saves a plan. **Approve spending in the local studio.** The worker polls approved jobs every two seconds; n8n's hourly monitor does not start another worker or approve credits. Character selection, recovery and revisions are available in the studio. The exports contain no embedded secrets or active schedules.
+The n8n form saves a plan. **Approve spending in the local studio.** The worker polls approved jobs every two seconds; n8n's hourly monitor does not start another worker or approve credits. Character selection, recovery and revisions are available in the studio. The exports contain no embedded secrets or active schedules. The uploader also requires the same YouTube OAuth2 credential on all its Google/YouTube nodes. See [YouTube setup and review](docs/YOUTUBE.md).
 
 For n8n on EC2, run this from the browser computer, using your actual SSH host alias:
 
@@ -137,7 +138,7 @@ Offline tests cover credit boundaries, duplicate approval/claim prevention, rest
 
 Hypit source uses its actual `check`, `plan`, `build`, `status` and `get` commands. Only local media/rendering endpoints are configured; there is no hosted generation credential in Hypit. See [verification notes](docs/VERIFICATION.md) for exactly what was exercised.
 
-**Remaining limits:** Flow automation is unofficial and can break when Google changes its UI. Login, CAPTCHA and account restrictions may require you. Native Flow narration may vary in voice, pronunciation or accuracy; an audio stream does not prove correct speech. Caption timing is per scene, not word-level ASR. Identity descriptions are not reference-image conditioning. Video checks cover stream presence, duration, aspect, resolution and decoding, not semantic quality. Real n8n import/form execution, Flow generation and first complete owner-account video remain live validation steps. No scheduled story invention, notifications to external accounts, YouTube upload, monetization promise or unlimited-generation claim is included.
+**Remaining limits:** Flow automation is unofficial and can break when Google changes its UI. Login, CAPTCHA and account restrictions may require you. Native Flow narration may vary in voice, pronunciation or accuracy; an audio stream does not prove correct speech. Caption timing is per scene, not word-level ASR. Identity descriptions are not reference-image conditioning. Video checks cover stream presence, duration, aspect, resolution and decoding, not semantic quality. Real n8n import/form execution, Flow generation and first complete owner-account video remain live validation steps. No scheduled story invention, external messaging, public publishing, monetization promise or unlimited-generation claim is included. Private upload code still needs owner-account validation.
 
 Private state: `~/.local/share/wondertales-v2`, or a consistently set absolute `WONDERTALES_HOME`. Back up the whole folder while the worker is stopped. Browser profiles and n8n data need their own private backups. Never commit state, cookies or tokens.
 

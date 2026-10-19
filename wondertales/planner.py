@@ -4,13 +4,15 @@ import math
 import re
 import urllib.request
 
+from .youtube import CHANNEL_DEFAULTS, channel_settings
+
 
 DEFAULTS = {
     "flow_profile": "wondertales", "flow_model": "veo-lite",
     "credits_per_clip": 0, "daily_credit_cap": 0,
     "planner": "rules", "ollama_url": "http://127.0.0.1:11434",
     "ollama_model": "qwen2.5:1.5b", "style": "Warm colourful 3D storybook animation",
-    "characters": [], "chrome_path": "",
+    "characters": [], "chrome_path": "", "youtube": CHANNEL_DEFAULTS,
 }
 
 
@@ -30,6 +32,7 @@ def validate_settings(data):
     if set(data) - set(DEFAULTS):
         raise ValueError("Unknown settings field")
     settings = {**DEFAULTS, **data}
+    settings["youtube"] = channel_settings(settings["youtube"])
     for key in ("flow_profile", "flow_model", "ollama_model"):
         if not re.fullmatch(r"[A-Za-z0-9_:.\-/]{1,100}", str(settings[key])) or str(settings[key]).startswith("-"):
             raise ValueError(f"Invalid {key}")

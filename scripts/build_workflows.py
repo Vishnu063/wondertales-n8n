@@ -1,4 +1,4 @@
-"""Generate three inactive n8n exports; configure one Header Auth credential on import."""
+"""Generate focused inactive n8n exports; credentials are selected after import."""
 import json
 from pathlib import Path
 
@@ -40,3 +40,46 @@ write("02-job-status", [{"id": "manual", "name": "Check progress", "type": "n8n-
 write("03-queue-monitor", [{"id": "schedule", "name": "Every hour", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2, "position": [0, 0], "parameters": {"rule": {"interval": [{"field": "hours", "hoursInterval": 1}]}}},
     http("tick", "Check approved queue", "POST", "/api/tick", 280, "={}"),
     http("jobs", "Progress report", "GET", "/api/jobs", 560)])
+
+
+def code(ident, name, js, x):
+    return {"id": ident, "name": name, "type": "n8n-nodes-base.code", "typeVersion": 2,
+            "position": [x, 0], "parameters": {"jsCode": js}}
+
+
+def google(ident, name, url, x):
+    return {"id": ident, "name": name, "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2,
+            "position": [x, 0], "parameters": {"url": url, "authentication": "predefinedCredentialType",
+              "nodeCredentialType": "youTubeOAuth2Api", "options": {"timeout": 120000}}}
+
+
+download = http("download", "Download final video", "GET", "", 1200)
+download["parameters"]["url"] = "={{ 'http://127.0.0.1:8099/api/video/' + $('Claim upload').first().json.id }}"
+download["parameters"]["options"]["response"] = {"response": {"responseFormat": "file", "outputPropertyName": "data"}}
+upload = {"id": "upload", "name": "Upload Private video", "type": "n8n-nodes-base.youTube", "typeVersion": 1,
+    "position": [1440, 0], "retryOnFail": False, "parameters": {"resource": "video", "operation": "upload",
+        "title": "={{ $('Claim upload').first().json.metadata.title }}",
+        "regionCode": "={{ $('Claim upload').first().json.region }}",
+        "categoryId": "={{ $('Claim upload').first().json.metadata.category_id }}", "binaryProperty": "data",
+        "options": {"privacyStatus": "private", "notifySubscribers": False,
+            "description": "={{ $('Claim upload').first().json.metadata.description }}",
+            "tags": "={{ $('Claim upload').first().json.metadata.tags.join(',') }}",
+            "defaultLanguage": "={{ $('Claim upload').first().json.metadata.language }}",
+            "selfDeclaredMadeForKids": "={{ $('Claim upload').first().json.metadata.made_for_kids }}"}}}
+nodes = [
+    {"id": "upload-schedule", "name": "Every ten minutes", "type": "n8n-nodes-base.scheduleTrigger", "typeVersion": 1.2,
+     "position": [0, 0], "parameters": {"rule": {"interval": [{"field": "minutes", "minutesInterval": 10}]}}},
+    http("ready", "Find ready video", "GET", "/api/upload/next", 240),
+    code("candidate", "Stop if nothing ready", "const jobs=$input.first().json.jobs;if(!Array.isArray(jobs))throw Error('Invalid worker response');return jobs.slice(0,1).map(j=>({json:j}));", 480),
+    google("channel", "Check connected channel", "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true", 720),
+    code("verify-channel", "Match intended channel", "const j=$('Stop if nothing ready').first().json;const items=$input.first().json.items;if(!Array.isArray(items)||items.length!==1||items[0].id!==j.channel_id)throw Error('Select the intended channel with the SAME OAuth credential on all Google/YouTube nodes. No upload claimed.');return [{json:j}];", 850),
+    http("claim", "Claim upload", "POST", "/api/upload/claim", 1000,
+         '={{ JSON.stringify({id:$json.id,channel_id:$json.channel_id}) }}'),
+    download, upload,
+    code("video-id", "Check returned video ID", "const id=$input.first().json.uploadId||$input.first().json.id;if(!/^[A-Za-z0-9_-]{11}$/.test(String(id||'')))throw Error('Upload outcome uncertain. Check YouTube Studio; do not retry the upload node.');return [{json:{videoId:id}}];", 1680),
+    google("verify-video", "Verify uploaded video", "={{ 'https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=' + $json.videoId }}", 1920),
+    http("record", "Record verified upload", "POST", "/api/upload/complete", 2160,
+         '={{ JSON.stringify({id:$("Claim upload").first().json.id,claim:$("Claim upload").first().json.claim,video:$json.items?.[0]||{}}) }}')]
+for n in nodes:
+    n["retryOnFail"] = False
+write("04-private-youtube-upload", nodes)

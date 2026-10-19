@@ -76,6 +76,11 @@ class Engine:
             checks = media.render(work, job, hypit,
                 lambda build: self.store.update(ident, hypit_build=build), job.get("hypit_build"))
             self.store.update(ident, "Video ready for your review. Captions follow planned scene slots, not measured speech timing.", status="complete", checks=checks)
+            from .youtube import Uploads
+            try:
+                Uploads(self.store).prepare(ident)
+            except ValueError:
+                self.store.update(ident, "Video ready. Configure YouTube channel/audience in Settings to prepare upload details.")
         except Exception as exc:
             message = str(exc) if isinstance(exc, (ValueError, RuntimeError)) else "Tool operation failed. Check the local tool and resume; paid scenes remain checkpointed."
             self.store.update(ident, message, status="attention")
@@ -103,7 +108,7 @@ class Engine:
             raise ValueError("Choose a complete job, valid scene and a 5–1500 character direction")
         import copy
         plan = copy.deepcopy(old)
-        for key in ("id", "events", "cap", "created", "message", "hypit_build", "checks"):
+        for key in ("id", "events", "cap", "created", "message", "hypit_build", "checks", "upload"):
             plan.pop(key, None)
         plan.update(parent=ident, reserved=0, estimate=old["credits_per_clip"])
         plan["scenes"][index].update(state="pending", visual=direction)

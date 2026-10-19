@@ -1,0 +1,342 @@
+{
+  "name": "04-private-youtube-upload",
+  "active": false,
+  "nodes": [
+    {
+      "id": "upload-schedule",
+      "name": "Every ten minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "ready",
+      "name": "Find ready video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:8099/api/upload/next",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 240000
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "candidate",
+      "name": "Stop if nothing ready",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const jobs=$input.first().json.jobs;if(!Array.isArray(jobs))throw Error('Invalid worker response');return jobs.slice(0,1).map(j=>({json:j}));"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "channel",
+      "name": "Check connected channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/channels?part=id&mine=true",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "verify-channel",
+      "name": "Match intended channel",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const j=$('Stop if nothing ready').first().json;const items=$input.first().json.items;if(!Array.isArray(items)||items.length!==1||items[0].id!==j.channel_id)throw Error('Select the intended channel with the SAME OAuth credential on all Google/YouTube nodes. No upload claimed.');return [{json:j}];"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "claim",
+      "name": "Claim upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1000,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8099/api/upload/claim",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 240000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({id:$json.id,channel_id:$json.channel_id}) }}"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "download",
+      "name": "Download final video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'http://127.0.0.1:8099/api/video/' + $('Claim upload').first().json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 240000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "upload",
+      "name": "Upload Private video",
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        0
+      ],
+      "retryOnFail": false,
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Claim upload').first().json.metadata.title }}",
+        "regionCode": "={{ $('Claim upload').first().json.region }}",
+        "categoryId": "={{ $('Claim upload').first().json.metadata.category_id }}",
+        "binaryProperty": "data",
+        "options": {
+          "privacyStatus": "private",
+          "notifySubscribers": false,
+          "description": "={{ $('Claim upload').first().json.metadata.description }}",
+          "tags": "={{ $('Claim upload').first().json.metadata.tags.join(',') }}",
+          "defaultLanguage": "={{ $('Claim upload').first().json.metadata.language }}",
+          "selfDeclaredMadeForKids": "={{ $('Claim upload').first().json.metadata.made_for_kids }}"
+        }
+      }
+    },
+    {
+      "id": "video-id",
+      "name": "Check returned video ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const id=$input.first().json.uploadId||$input.first().json.id;if(!/^[A-Za-z0-9_-]{11}$/.test(String(id||'')))throw Error('Upload outcome uncertain. Check YouTube Studio; do not retry the upload node.');return [{json:{videoId:id}}];"
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "verify-video",
+      "name": "Verify uploaded video",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1920,
+        0
+      ],
+      "parameters": {
+        "url": "={{ 'https://www.googleapis.com/youtube/v3/videos?part=snippet,status&id=' + $json.videoId }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "youTubeOAuth2Api",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "record",
+      "name": "Record verified upload",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8099/api/upload/complete",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 240000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({id:$(\"Claim upload\").first().json.id,claim:$(\"Claim upload\").first().json.claim,video:$json.items?.[0]||{}}) }}"
+      },
+      "retryOnFail": false
+    }
+  ],
+  "connections": {
+    "Every ten minutes": {
+      "main": [
+        [
+          {
+            "node": "Find ready video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find ready video": {
+      "main": [
+        [
+          {
+            "node": "Stop if nothing ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stop if nothing ready": {
+      "main": [
+        [
+          {
+            "node": "Check connected channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check connected channel": {
+      "main": [
+        [
+          {
+            "node": "Match intended channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match intended channel": {
+      "main": [
+        [
+          {
+            "node": "Claim upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claim upload": {
+      "main": [
+        [
+          {
+            "node": "Download final video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download final video": {
+      "main": [
+        [
+          {
+            "node": "Upload Private video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Private video": {
+      "main": [
+        [
+          {
+            "node": "Check returned video ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check returned video ID": {
+      "main": [
+        [
+          {
+            "node": "Verify uploaded video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify uploaded video": {
+      "main": [
+        [
+          {
+            "node": "Record verified upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

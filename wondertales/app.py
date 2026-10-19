@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from .engine import Engine
 from .planner import make_plan
 from .store import Store
+from .youtube import Uploads
 
 
 def main():
@@ -28,6 +29,7 @@ def main():
         token_path.write_text(secrets.token_urlsafe(32))
     token = token_path.read_text().strip()
     engine = Engine(store)
+    uploads = Uploads(store)
     if opt.doctor:
         print(json.dumps(engine.tools(), indent=2))
         return
@@ -81,6 +83,9 @@ def main():
                     return self.reply(store.list())
                 if path == "/api/doctor":
                     return self.reply(engine.tools())
+                if path == "/api/upload/next":
+                    candidate = uploads.next()
+                    return self.reply({"jobs": [] if candidate is None else [candidate]})
                 if path.startswith("/api/jobs/"):
                     return self.reply(store.get(path.split("/")[-1]))
                 if path.startswith("/api/video/"):
@@ -133,6 +138,14 @@ def main():
                     return self.reply(engine.revise(body["id"], int(body["scene"]) - 1, body["direction"]))
                 if self.path == "/api/retry-render":
                     return self.reply(engine.retry_render(body["id"]))
+                if self.path == "/api/upload/prepare":
+                    return self.reply(uploads.prepare(body["id"]))
+                if self.path == "/api/upload/approve":
+                    return self.reply(uploads.approve(body["id"], body["metadata"]))
+                if self.path == "/api/upload/claim":
+                    return self.reply(uploads.claim(body["id"], body["channel_id"]))
+                if self.path == "/api/upload/complete":
+                    return self.reply(uploads.complete(body["id"], body["claim"], body["video"]))
                 if self.path == "/api/tick":
                     # Worker already polls. n8n can monitor/wake without a second processing owner.
                     return self.reply({"queued": sum(j["status"] == "queued" for j in store.list()), "worker": "automatic"})

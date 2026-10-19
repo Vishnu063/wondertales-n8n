@@ -36,7 +36,7 @@ Planning and input validation are independent of Google login. Approving zero/un
 
 The story export is intentionally a plan-only form. No POST endpoint implicitly approves new spending, except the explicit `approve` endpoint with a supplied cap. Only connect that endpoint to automation if you deliberately want preauthorised recurring production and have defined the source, budget and frequency. The shipped hourly workflow reports status; it is not a daily generation schedule.
 
-Fresh production needs an approval in the studio. After approval, scene production and assembly run without a user click between successful stages. Reconciliation, Google login/verification, plan revisions and higher budgets need an operator. External messaging and uploads are absent.
+Fresh production needs an approval in the studio. After approval, scene production and assembly run without a user click between successful stages. Reconciliation, Google login/verification, plan revisions and higher budgets need an operator. External messaging and public publishing are absent. Optional Private uploads use the separately configured n8n workflow.
 
 ## Model and dependency references
 
@@ -47,3 +47,19 @@ Fresh production needs an approval in the studio. After approval, scene producti
 - [n8n workflow import/export](https://docs.n8n.io/workflows/export-import/)
 
 Google accounts/browser sessions are never bundled in this repository. Using an existing Google subscription does not supply API credits or unlimited generation.
+
+## Private upload API
+
+All routes require the same worker token. `settings.youtube` stores the expected channel, category/region, explicit audience, tags, hashtags, footer and opt-in automatic Private approval. Existing settings gain these defaults without overwriting other values.
+
+| Method/path | Purpose |
+| --- | --- |
+| `POST /api/upload/prepare` | `{id}`: derive details from a completed job; defaults snapshot into the job |
+| `POST /api/upload/approve` | `{id, metadata}`: validate edited details and queue Private upload |
+| `GET /api/upload/next` | Returns `{jobs: []}` or one ready candidate; read-only |
+| `POST /api/upload/claim` | `{id, channel_id}`: atomic single-use handoff; returns metadata and claim receipt |
+| `POST /api/upload/complete` | `{id, claim, video}`: record a read-back YouTube resource only after ID, channel, Private visibility and metadata checks |
+
+Upload state: `review → ready → claimed → uploaded`. A claimed job stays claimed across restarts and never reappears in the ready queue. An interrupted upload requires YouTube/n8n reconciliation. There is no automatic claim reset or upload retry. Normal full-workflow reruns cannot claim it twice; manually reexecuting a cached upload node can bypass orchestration, so never do that. A revision gets its own upload state rather than inheriting the original video's ID.
+
+Metadata generation uses the supplied title and up to two script sentences plus saved footer/hashtags. It does not call another model, invent SEO metrics or guarantee content accuracy. Audience is never inferred. All stored and mapped upload visibility is Private. Thumbnail and playlist assignment remain manual in YouTube Studio.

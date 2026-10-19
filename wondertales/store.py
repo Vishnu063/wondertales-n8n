@@ -48,7 +48,7 @@ class Store:
             if data is not None:
                 data = validate_settings(data)
                 db.execute("UPDATE settings SET data=? WHERE id=1", (json.dumps(data),))
-            return json.loads(db.execute("SELECT data FROM settings WHERE id=1").fetchone()[0])
+            return {**DEFAULTS, **json.loads(db.execute("SELECT data FROM settings WHERE id=1").fetchone()[0])}
 
     def _read(self, db, ident):
         row = db.execute("SELECT data FROM jobs WHERE id=?", (ident,)).fetchone()
