@@ -1,7 +1,5 @@
-name: Offline checks (no provider credits)
-on:
-  push:
-  pull_request:
+name: Agent checks (no Flow credits)
+on: [push, pull_request]
 permissions:
   contents: read
 jobs:
@@ -9,11 +7,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install media tools
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg fonts-noto-core
-      - name: Check Python and actual media assembly
-        run: python3 -m unittest discover -s tests -v
-      - name: Check workflow exports and casting
-        run: node tests/check_workflows.js
-      - name: Check shell scripts
-        run: for script in scripts/*.sh; do bash -n "$script"; done
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python3 -m unittest discover -s tests -v
+      - run: python3 scripts/build_workflows.py && git diff --exit-code -- n8n/workflows
+      - run: node tests/check_workflows.js
+      - run: for script in scripts/*.sh; do bash -n "$script"; done

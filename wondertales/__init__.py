@@ -1,1 +1,1 @@
-"""WonderTales local video worker."""
+"""WonderTales v2: local video production worker."""

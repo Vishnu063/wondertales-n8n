@@ -1,0 +1,134 @@
+{
+  "name": "01-story-plan",
+  "active": false,
+  "nodes": [
+    {
+      "id": "story",
+      "name": "Your story",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "wondertales-v2-story",
+      "parameters": {
+        "path": "wondertales-v2-story",
+        "responseMode": "lastNode",
+        "formTitle": "WonderTales \u00b7 New story",
+        "formDescription": "Create a scene plan without spending Flow credits. Review and approve it in the local studio.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Title",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Story",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Language",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "English"
+                  },
+                  {
+                    "option": "Hindi"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Format",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "9:16"
+                  },
+                  {
+                    "option": "16:9"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Seconds",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "16"
+                  },
+                  {
+                    "option": "32"
+                  },
+                  {
+                    "option": "64"
+                  },
+                  {
+                    "option": "120"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "options": {
+          "respondWithOptions": {
+            "values": {
+              "respondWith": "text",
+              "formSubmittedText": "Your plan was saved. Open the WonderTales studio to review it and approve a credit cap."
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "plan",
+      "name": "Save scene plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:8099/api/plan",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 240000
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({title:$json.Title,story:$json.Story,language:$json.Language,aspect:$json.Format,duration:Number($json.Seconds)}) }}"
+      }
+    }
+  ],
+  "connections": {
+    "Your story": {
+      "main": [
+        [
+          {
+            "node": "Save scene plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata"
+  }
+}

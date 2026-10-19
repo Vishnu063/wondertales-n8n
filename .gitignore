@@ -1,4 +1,6 @@
 .env
+node_modules/
+.hypit/
 .env.*
 !.env.example
 .venv/

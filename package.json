@@ -1,0 +1,7 @@
+{
+  "name": "wondertales-agent",
+  "version": "2.0.0",
+  "private": true,
+  "description": "n8n orchestration, local planning, Google Flow clips and Hypit assembly",
+  "dependencies": { "@hypit/hypit": "0.3.1" }
+}

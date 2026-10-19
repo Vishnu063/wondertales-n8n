@@ -1,9 +1,10 @@
 {
-  "name": "WonderTales — Rule-Based Daily Queue",
+  "name": "03-queue-monitor",
+  "active": false,
   "nodes": [
     {
-      "id": "25cad5ab-4a2c-54b3-9314-9f954ceac671",
-      "name": "Daily Queue Tick",
+      "id": "schedule",
+      "name": "Every hour",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
       "position": [
@@ -14,75 +15,72 @@
         "rule": {
           "interval": [
             {
-              "field": "minutes",
-              "minutesInterval": 5
+              "field": "hours",
+              "hoursInterval": 1
             }
           ]
         }
       }
     },
     {
-      "id": "d7f5fe06-55e9-5e24-b6d2-5c6320fd7371",
-      "name": "Check Daily Queue",
+      "id": "tick",
+      "name": "Check approved queue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        240,
+        280,
         0
       ],
       "parameters": {
-        "url": "http://127.0.0.1:8099/v1/queue/tick",
         "method": "POST",
+        "url": "http://127.0.0.1:8099/api/tick",
         "authentication": "genericCredentialType",
-        "options": {
-          "timeout": 30000
-        },
         "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 240000
+        },
         "sendBody": true,
-        "contentType": "json",
         "specifyBody": "json",
-        "jsonBody": "={{ {} }}"
-      },
-      "retryOnFail": false
+        "jsonBody": "={}"
+      }
     },
     {
-      "id": "aecefb3d-7839-52d7-8647-e97e7d0d18e0",
-      "name": "Show Queue Result",
+      "id": "jobs",
+      "name": "Progress report",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        480,
+        560,
         0
       ],
       "parameters": {
-        "url": "http://127.0.0.1:8099/v1/queue/summary",
         "method": "GET",
+        "url": "http://127.0.0.1:8099/api/jobs",
         "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "options": {
-          "timeout": 30000
-        },
-        "genericAuthType": "httpHeaderAuth"
-      },
-      "retryOnFail": false
+          "timeout": 240000
+        }
+      }
     }
   ],
   "connections": {
-    "Daily Queue Tick": {
+    "Every hour": {
       "main": [
         [
           {
-            "node": "Check Daily Queue",
+            "node": "Check approved queue",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Check Daily Queue": {
+    "Check approved queue": {
       "main": [
         [
           {
-            "node": "Show Queue Result",
+            "node": "Progress report",
             "type": "main",
             "index": 0
           }
@@ -90,10 +88,8 @@
       ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1",
     "timezone": "Asia/Kolkata"
-  },
-  "tags": []
+  }
 }

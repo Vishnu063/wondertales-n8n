@@ -1,2 +1,1 @@
 gflow-cli==0.85.0
-edge-tts>=7.2,<8
