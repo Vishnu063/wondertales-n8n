@@ -10,6 +10,7 @@ import threading
 import time
 from urllib.parse import urlparse
 
+from . import arcreel
 from .engine import Engine
 from .planner import make_plan
 from .store import Store
@@ -80,14 +81,16 @@ def main():
                 if path == "/api/settings":
                     return self.reply(store.settings())
                 if path == "/api/jobs":
-                    return self.reply(store.list())
+                    return self.reply([arcreel.detail(store, j) for j in store.list()])
+                if path == "/api/arcreel":
+                    return self.reply(arcreel.Client().status())
                 if path == "/api/doctor":
                     return self.reply(engine.tools())
                 if path == "/api/upload/next":
                     candidate = uploads.next()
                     return self.reply({"jobs": [] if candidate is None else [candidate]})
                 if path.startswith("/api/jobs/"):
-                    return self.reply(store.get(path.split("/")[-1]))
+                    return self.reply(arcreel.detail(store, store.get(path.split("/")[-1])))
                 if path.startswith("/api/video/"):
                     job = store.get(path.split("/")[-1])
                     if job["status"] != "complete":
@@ -128,6 +131,8 @@ def main():
                     return self.reply(store.create(make_plan(body, store.settings())))
                 if self.path == "/api/settings":
                     return self.reply(store.settings(body))
+                if self.path == "/api/arcreel":
+                    return self.reply(arcreel.send_job(store, body["id"]))
                 if self.path == "/api/approve":
                     return self.reply(store.approve(body["id"], body["cap"]))
                 if self.path == "/api/resume":

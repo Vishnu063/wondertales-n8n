@@ -313,3 +313,24 @@ Hypit source uses its actual `check`, `plan`, `build`, `status` and `get` comman
 Private state: `~/.local/share/wondertales-v2`, or a consistently set absolute `WONDERTALES_HOME`. Back up the whole folder while the worker is stopped. Browser profiles and n8n data need their own private backups. Never commit state, cookies or tokens.
 
 Further detail: [API & architecture](docs/API.md).
+
+## Optional ArcReel storyboard workspace
+
+[ArcReel](https://github.com/ArcReel/ArcReel) runs separately. Follow its upstream installation README; configure its own model providers if you want generation. This adapter needs no extra Python dependencies and does not install ArcReel or provide free unlimited videos.
+
+Obtain a bearer access token from ArcReel's `/api/v1/auth/token` endpoint using your ArcReel credentials. It is **not** the WonderTales worker token. In the terminal starting the worker:
+
+```bash
+export ARCREEL_URL=http://127.0.0.1:1241
+read -r -s -p 'ArcReel bearer token: ' ARCREEL_TOKEN; echo
+export ARCREEL_TOKEN
+bash scripts/start.sh
+```
+
+Use HTTPS with a trusted certificate for remote instances. The URL must be an origin without a path, query or embedded credentials; HTTP is accepted only on loopback. The token stays in the worker environment and is never returned to the studio or stored in transfer receipts. Without it the normal Flow/Hypit workflow still works.
+
+Create a plan, expand **Optional ArcReel workspace** on its card and choose **Send brief to ArcReel**. A separate storyboard project named `wt-<job-id>` receives the original story, language, format, duration, cast, creative profile and eight-second scene narration/visual directions as `source/novel.txt`. Open the configured ArcReel workspace to review it. The adapter explicitly uses `generate_overview=false` and `narration_delivery=post_production`; it requests no model inference, TTS or video generation. No media or upload credentials are transferred. ArcReel generation and returning its finished media to WonderTales are manual; this is not another automatic rendering backend.
+
+Receipts are stored at `$WONDERTALES_HOME/arcreel/<job-id>.json` (default `~/.local/share/wondertales-v2/arcreel/`). Successful repeats return the same receipt without overwriting external edits. An incomplete/uncertain transfer blocks automatic resubmission across restarts. Inspect its phase and the named project/source in ArcReel, then complete any missing transfer manually. Do not blindly delete receipts and resend. Revisions have separate IDs and separate receipts. Flow approval, credit limits, the existing renderer and Private YouTube upload workflow are unchanged.
+
+API compatibility was inspected against ArcReel revision `43bc1575f1cf60318769476a04d219ab7233dc42`. Local HTTP fixtures verify the contract and failure handling; a live ArcReel installation, model generation and resulting video quality have not been tested here.

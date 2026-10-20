@@ -69,3 +69,14 @@ Metadata generation uses the supplied title and up to two script sentences plus 
 `settings.story_profile` contains `audience`, `tone` and `boundaries`, each a nonblank string of up to 600 characters. Unknown fields and invalid values are rejected before changing saved settings. Older settings receive defaults. Creating a plan snapshots the profile; changes to settings do not rewrite an existing job or its budget approval.
 
 Ollama receives this profile with the narration and per-scene direction as structured input. It still supplies visual descriptions only. The template fallback and Flow prompt retain the preferences. The application preserves the supplied story and narration, including intentional repeated Hindi/English lines. No title/hook score, automatic transcript cutting or retention inference was added. The creative audience is independent of the explicit YouTube Made for kids setting.
+
+## Optional ArcReel handoff
+
+These endpoints require the existing `X-Wondertales-Token` header. Configure `ARCREEL_URL` and the separate `ARCREEL_TOKEN` server-side, then restart the worker.
+
+| Method/path | Purpose |
+| --- | --- |
+| `GET /api/arcreel` | Returns `{configured, url}`; presence of configuration only, not live readiness; never the token |
+| `POST /api/arcreel` | `{id}`: manually transfer a saved plan to a separate ArcReel storyboard workspace; returns a durable receipt |
+
+Job list/detail responses include `arcreel` (receipt or null). This transfer creates a project and uploads source text only. No generation, budget approval, media import or publishing is triggered. Source overview generation is explicitly disabled. Receipts live separately from job/ledger state; an uncertain mutation blocks automatic retry. See README for inspection and manual recovery.
