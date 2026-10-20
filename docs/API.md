@@ -63,3 +63,9 @@ All routes require the same worker token. `settings.youtube` stores the expected
 Upload state: `review → ready → claimed → uploaded`. A claimed job stays claimed across restarts and never reappears in the ready queue. An interrupted upload requires YouTube/n8n reconciliation. There is no automatic claim reset or upload retry. Normal full-workflow reruns cannot claim it twice; manually reexecuting a cached upload node can bypass orchestration, so never do that. A revision gets its own upload state rather than inheriting the original video's ID.
 
 Metadata generation uses the supplied title and up to two script sentences plus saved footer/hashtags. It does not call another model, invent SEO metrics or guarantee content accuracy. Audience is never inferred. All stored and mapped upload visibility is Private. Thumbnail and playlist assignment remain manual in YouTube Studio.
+
+## Story profile
+
+`settings.story_profile` contains `audience`, `tone` and `boundaries`, each a nonblank string of up to 600 characters. Unknown fields and invalid values are rejected before changing saved settings. Older settings receive defaults. Creating a plan snapshots the profile; changes to settings do not rewrite an existing job or its budget approval.
+
+Ollama receives this profile with the narration and per-scene direction as structured input. It still supplies visual descriptions only. The template fallback and Flow prompt retain the preferences. The application preserves the supplied story and narration, including intentional repeated Hindi/English lines. No title/hook score, automatic transcript cutting or retention inference was added. The creative audience is independent of the explicit YouTube Made for kids setting.

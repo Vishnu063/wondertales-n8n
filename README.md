@@ -117,10 +117,27 @@ In **Settings**:
 2. Check Flow's actual displayed rate. Enter **credits per eight-second clip** and a **daily credit cap**. Both start at zero, so generation is blocked until configured.
 3. Save up to ten characters as `[{"name":"Milo","description":"A small orange fox wearing a blue scarf"}]`. Choose up to three per story.
 4. Choose Templates for lowest memory, or Ollama for AI visual planning. Settings apply to **new** plans. Each job retains its original account, model, price, cast and style.
+5. Open **Story voice & audience** to save who is watching, the narrator tone and creative boundaries. These preferences are saved with new plans and shown in their review panel. The creative audience does not set YouTube’s separate Made for kids flag.
 
 Write the spoken story in Hindi or English. Choose vertical or landscape and 16, 32, 64 or 120 seconds. The API also accepts other multiples of eight, from 8 to 120. Longer videos require more clips. The planner rejects narration that exceeds a conservative speech budget instead of silently truncating it.
 
 Click **Create scene plan**, review its scenes and estimated credits, then **Approve & create video**. Once approved, the local worker completes generation and assembly automatically while tools and login remain available. If a step needs you, the status explains why. Download the finished MP4 and watch/listen before sharing it.
+
+### Saved story profile and scene direction
+
+In **Settings → Story voice & audience**, save three short preferences:
+
+| Field | Example |
+| --- | --- |
+| Who is watching? | Children enjoying simple Hindi animal stories |
+| How should it feel and sound? | Gentle, cheerful and easy to follow |
+| Creative boundaries | Keep repeated rhyme lines; use gentle imagery |
+
+The existing planner uses these preferences to guide scene descriptions. Opening scenes establish the supplied character/action promptly; middle scenes follow clear visual beats; the final scene illustrates the supplied ending. The generation prompt also receives the saved profile and narrator-tone preference. Your script stays unchanged, including Hindi text and repeated rhyme lines. One-scene stories get one coherent scene direction rather than competing opening/closing instructions.
+
+Changes apply to new plans. Existing plans retain their profile; older saved jobs remain readable with default preferences. Templates continue to work without a model, and an unavailable Ollama call remains a labelled fallback. These are directing instructions, not a verified guarantee of character consistency, voice identity or creative quality. Live generation still needs testing.
+
+The profile and storytelling approach draws on general ideas reviewed in [Jakeschincariol/youtube-agent-skill, commit a2feb21](https://github.com/Jakeschincariol/youtube-agent-skill/tree/a2feb2104981a375ffd4f87ee04f4f5344ac43c6) ([MIT licence](https://github.com/Jakeschincariol/youtube-agent-skill/blob/a2feb2104981a375ffd4f87ee04f4f5344ac43c6/LICENSE)). This is a focused implementation in our existing planner, with no additional dependencies. The reviewed English scoring and retention utilities are not installed or used to approve production.
 
 ### Optional small local AI
 
